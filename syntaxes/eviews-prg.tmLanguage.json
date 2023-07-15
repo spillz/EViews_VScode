@@ -1,0 +1,101 @@
+{
+	"$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+	"name": "EViews Scripting Language",
+	"foldingStartMarker":
+	  "(^\\s*<?%?\\s*'?\\s*(?i:(subroutine|if|while|for))\\s*.*$)",
+	"foldingStopMarker":
+	  "(^\\s*<?%?\\s*\\s*'?\\s*(?i:(endsub|endif|wend|next))\\s*.*$)",
+	"patterns": [
+		{
+			"include": "#comments"
+		},
+		{
+			"include": "#strings"
+		},
+		{
+			"include": "#scalars"
+		},
+		{
+			"include": "#string-var"
+		},
+		{
+			"include": "#scalar-var"
+		},
+		{
+			"include": "#keywords"
+		},
+		{
+			"include": "#objects"
+		},
+		{
+			"include": "#functions"
+		},
+		{
+			"include": "#operators"
+		},
+		{
+			"include": "#vars"
+		}
+	],
+	"repository": {
+		"comments": {
+			"begin": "\\'",
+			"end":"\\n",
+			"name": "comment"
+		},
+		"keywords": {
+			"name": "keyword",
+			"match": "\\b(?i)(call|else|endif|endsub|exitloop|for|if|include|next|return|sleep|step|stop|subroutine|then|to|wend|while)\\b"
+		},
+		"strings": {
+			"name": "string",
+			"begin": "\"",
+			"end": "\""
+		},
+		"scalars": {
+			"match":
+			  "-?\\b((0(x|X)[0-9a-fA-F]*)|(([0-9]+\\.?[0-9]*)|(\\.[0-9]+))((e|E)(\\+|-)?[0-9]+)?)\\b",
+			"name": "constant.numeric"
+		},
+		"scalar-var": {
+			"match":
+			  "!\\b[a-zA-Z_]\\w*\\b",
+			"name": "variable.parameter"
+		},
+		"string-var": {
+			"match":
+			  "%\\b[a-zA-Z_]\\w*\\b",
+			"name": "variable.parameter"
+		},
+		"functions": {
+			"match": "@\\b[a-zA-Z_]\\w*\\b",
+			"name": "support.function"
+		},
+		"vars": {
+			"match":
+			  "\\b[a-zA-Z_]\\w*\\b",
+			"name": "other"
+		},
+		"objects": {
+			"captures": {
+			  "1": {
+				"name": "entity.name.class"
+			  },
+			  "2": {
+				"name": "variable"
+			  }
+			},
+			"match":
+			  "\\b(?i)(alpha|model|svector|coef|pool|sym|equation|rowvector|system|factor|sample|table|geomap|scalar|text|graph|series|userobj|group|spool|valmap|logl|sspace|var|matrix|string|vector)\\b\\s*\\b([a-zA-Z]\\w*?)\\b",
+			"name": "object.definition"
+		},
+		"operators": {
+			"match":
+			  "(!|\\+|-|\\*|/|<>|=|<=|>=|\\^|\\b(?i)(and|or)\\b)",
+			"name": "keyword.operator"
+		}
+		
+	},
+	"scopeName": "source.eviews"
+}
+
