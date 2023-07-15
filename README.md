@@ -1,6 +1,6 @@
 # eviews-language-extension README
 
-VS Code Extension with Programming Language Support for EViews, the suite of statistical, time series, forecasting, and modeling tools.
+A VS Code extension that adds programming language support for EViews, the suite of statistical, time series, forecasting, and modeling tools.
 
 ## Features
 
