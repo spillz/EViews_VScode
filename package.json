@@ -3,7 +3,7 @@
   "displayName": "EViews Programming Language Extension",
   "description": "Syntax highlighting for the EViews scripting/programming language",
   "icon": "icon.png",
-  "publisher": "damienlmoore",
+  "publisher": "dlmprod",
   "license": "MIT License",
   "version": "0.1.0",
   "engines": {
