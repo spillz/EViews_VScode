@@ -1,10 +1,6 @@
 {
 	"$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
 	"name": "EViews Scripting Language",
-	"foldingStartMarker":
-	  "(^\\s*<?%?\\s*'?\\s*(?i:(subroutine|if|while|for))\\s*.*$)",
-	"foldingStopMarker":
-	  "(^\\s*<?%?\\s*\\s*'?\\s*(?i:(endsub|endif|wend|next))\\s*.*$)",
 	"patterns": [
 		{
 			"include": "#comments"

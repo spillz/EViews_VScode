@@ -15,3 +15,7 @@ None required to use the extension although you will obviously need a copy of EV
 ### 0.1.0
 
 Initial release of the extension with basic syntax highlighting support for the EViews scripting language.
+
+### 0.1.1
+
+Improved indentation and folding

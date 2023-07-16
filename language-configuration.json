@@ -19,5 +19,21 @@
         ["(", ")"],
         ["\"", "\""],
         ["{", "}"]
-    ]
+    ],
+    "indentationRules": {
+        "increaseIndentPattern": {
+            "pattern": "^\\s*\\b(SUBROUTINE|FOR|IF|WHILE|ELSE)\\b.*?\\s",
+            "flags": "i"
+        },
+        "decreaseIndentPattern": {
+            "pattern": "^\\s*\\b(ENDSUB|NEXT|ENDIF|WEND)\\b.*?\\s*",
+            "flags": "i"
+        }
+    },
+    "folding": {
+        "markers": {
+            "start": "(^\\s*(?i:(subroutine|if|while|for))\\s*.*$)",
+            "end": "(^\\s*(?i:(endsub|endif|wend|next))\\s*.*$)"
+        }
+      }
 }

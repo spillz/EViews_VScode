@@ -7,3 +7,7 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 ## [0.1.0] - 7/15/2023
 
 - Initial release
+
+## [0.1.1] - 7/16/2023
+
+- Indentation and folding
