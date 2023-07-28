@@ -71,7 +71,7 @@ export function activate(context: vscode.ExtensionContext) {
   context.subscriptions.push(vscode.workspace.onDidOpenTextDocument((doc)=> {
     console.log('Doc opened',doc.uri);
     if(doc.languageId==='eviews-prg') {
-      // parserCollection.push(doc.uri.toString());
+      parserCollection.push(doc.uri.toString());
     }
   }));
 
