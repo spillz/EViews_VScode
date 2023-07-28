@@ -71,7 +71,7 @@ export class ParsedSub {
                     this.calls.push(call);
                 }
             }
-            const match = lsu.match(/([%!][A-Z_]\w+)[ \t]*=.*/);
+            const match = lsu.match(/([%!][A-Z_]\w*)[ \t]*=.*/);
             if (match) {
                 const vname = match[1];
                 if (!this.vars.has(vname) && !this.args.has(vname)) {
@@ -81,7 +81,7 @@ export class ParsedSub {
                 continue
             }
             if(lsu.startsWith('FOR')) {
-                const match = lsu.slice(3).match(/([%!]?[A-Z_]\w+)\s*=?/)
+                const match = lsu.slice(3).match(/([%!]?[A-Z_]\w*)\s*=?/)
                 if(match) {
                     const type = match[1][0]==='%'? 'STRING':
                             match[1][0]==='!'? 'SCALAR':
@@ -95,7 +95,7 @@ export class ParsedSub {
             }
             for(const objectName in eviewsTypes) {
                 if(lsu.startsWith(objectName)) {
-                    const match = lsu.slice(objectName.length).match(/([A-Z_]\w+)/)
+                    const match = lsu.slice(objectName.length).match(/([A-Z_]\w*)/)
                     if(match) {
                         if (!this.vars.has(match[1]) && !this.args.has(match[1])) {
                             this.vars.push(v(objectName, match[1]))
@@ -270,7 +270,7 @@ export class ParsedFile {
                 }
                 continue
             }
-            let match = lsu.match(/([%!]\w+)[ \t]*=.*/);
+            let match = lsu.match(/([%!][A-Z_]\w*)[ \t]*=.*/);
             if (match) {
                 const varName = match[1];
                 const varType = varName[0]=='%'? 'STRING':'SCALAR';
@@ -290,7 +290,7 @@ export class ParsedFile {
                     [arg, argPart] = argPart.split(',',2);
                     arg = arg.trim();
                     argPart = argPart? argPart.trim():'';
-                    let argDef = arg.match(/(\w+)\s([%!][A-Z_]\w+)/)
+                    let argDef = arg.match(/(\w+)\s([%!][A-Z_]\w*)/)
                     if(argDef) {
                         args.push(v(argDef[1], argDef[2])); //argDef[1] contains the type. Check it is a valid one
                     } //track error if no match
@@ -323,7 +323,7 @@ export class ParsedFile {
                 continue
             }
             if(lsu.startsWith('FOR')) {
-                const match = lsu.slice(3).match(/([%!]?[A-Z_]\w+)\s*=?/)
+                const match = lsu.slice(3).match(/([%!]?[A-Z_]\w*)\s*=?/)
                 if(match) {
                     const type = match[1][0]==='%'? 'STRING':
                             match[1][0]==='!'? 'SCALAR':
@@ -337,7 +337,7 @@ export class ParsedFile {
             }
             for(const objectName of eviewsTypes) {
                 if(lsu.startsWith(objectName)) {
-                    const match = lsu.slice(objectName.length).match(/([A-Z_]\w+)/)
+                    const match = lsu.slice(objectName.length).match(/([A-Z_]\w*)/)
                     if(match && !this.vars.has(match[1])) {
                         this.vars.push(v(objectName, match[1]));
                     }
