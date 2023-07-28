@@ -1,0 +1,308 @@
+{
+    "For Loop Scalar": {
+      "prefix": ["for", "for-int", "for-scalar"],
+      "body": ["for ${1:!var} = ${2:!start} to ${3:!end}", "\t$0", "next"],
+      "description": "A scalar for loop."
+    },
+    "For Loop String": {
+        "prefix": ["for", "for-string"],
+        "body": ["for ${1:%s} ${2:\\{%space_sep_string\\}}", "\t$0", "next"],
+        "description": "A string for loop."
+    },
+    "If": {
+        "prefix": ["if"],
+        "body": ["if ${1:condition} then", "\t$0", "next"],
+        "description": "An if block."
+    },
+    "If Else": {
+        "prefix": ["if-else"],
+        "body": ["if ${2:condition} then", "\t$0", "else", "\t$1", "next"],
+        "description": "An if else block."
+    },
+    "While": {
+        "prefix": ["while"],
+        "body": ["while ${1:condition} then", "\t$0", "wend"],
+        "description": "A while loop."
+    },
+    "Subroutine": {
+        "prefix": ["subroutine"],
+        "body": ["subroutine ${1:sub_name}(${2:type1} ${3:arg1}, ${4:type2} ${5:arg2}, ${6:...})", "\t$0", "endsub"],
+        "description": "Subroutine definition."
+    },
+    "Call": {
+        "prefix": ["call"],
+        "body": ["call ${1:sub_name}(${2:arg1}, ${3:arg1}, ${4:...})"],
+        "description": "A subroutine call."
+    },
+    "@obsnum": {
+        "prefix": ["@obsnum"],
+        "body": ["@obsnum"],
+        "description": "returns the observation number of the current observation in the workfile."
+    },
+    "@elem": {
+        "prefix": ["@elem"],
+        "body": ["@elem(${1:x, \"arg\"})"],
+        "description": "returns the value of the series x at observation or date arg. If the workfile is undated, arg should be an integer corresponding to the observation ID as given in @obsnum. If the workfile is dated, arg should be a string representation of a date in the workfile. In both cases, the argument must be enclosed in double quotes. Note that @elem is not available in panel structured workfiles."
+    },
+    "@ispanel": {
+        "prefix": ["@ispanel"],
+        "body": ["@ispanel"],
+        "description": "returns indicator for whether the workfile is panel structured (0 if no workfile in memory)."
+    },
+    "@obsrange": {
+        "prefix": ["@obsrange"],
+        "body": ["@obsrange"],
+        "description": "returns number of observations in the current active workfile range (0 if no workfile in memory)."
+    },
+    "@obssmpl": {
+        "prefix": ["@obssmpl"],
+        "body": ["@obssmpl"],
+        "description": "returns number of observations in the current active workfile sample (0 if no workfile in memory)."
+    },
+    "@pagecount": {
+        "prefix": ["@pagecount"],
+        "body": ["@pagecount"],
+        "description": "returns the number of pages in the current active workfile (0 if no workfile in memory)"
+    },
+    "@pageexist": {
+        "prefix": ["@pageexist"],
+        "body": ["@pageexist"],
+        "description": "returns a 0 or 1 depending on whether the page specified by str exists in the current workfile."
+    },
+    "@pagefreq": {
+        "prefix": ["@pagefreq"],
+        "body": ["@pagefreq"],
+        "description": "returns the frequency of the active page."
+    },
+    "@pagename": {
+        "prefix": ["@pagename"],
+        "body": ["@pagename"],
+        "description": "returns the name of the active page."
+    },
+    "@pagelist": {
+        "prefix": ["@pagelist"],
+        "body": ["@pagelist"],
+        "description": "returns a space delimited string containing the names of all the pages in the current active workfile."
+    },
+    "@pagesmpl": {
+        "prefix": ["@pagesmpl"],
+        "body": ["@pagesmpl"],
+        "description": "returns the current sample for the active page."
+    },
+    "@pageids": {
+        "prefix": ["@pageids"],
+        "body": ["@pageids"],
+        "description": "returns the id series for the current active page. If the page is a regular dated page, “@date” is returned. If the page is irregular, or structured by an id series, names of the id series are returned. If the page is completely unstructured, empty string is returned. In a panel it returns the cross-section identifiers followed by the date identifier."
+    },
+    "@wfname": {
+        "prefix": ["@wfname"],
+        "body": ["@wfname"],
+        "description": "returns the current default workfile name."
+    },
+    "@wfpath": {
+        "prefix": ["@wfpath"],
+        "body": ["@wfpath"],
+        "description": "returns the current default workfile path."
+    },
+    "@date": {
+        "prefix": ["@date"],
+        "body": ["@date"],
+        "description": "returns the start date of the period of time of each observation of the workfile."
+    },
+    "@enddate": {
+        "prefix": ["@enddate"],
+        "body": ["@enddate"],
+        "description": "returns the end date of the period of time associated with each observation of the workfile."
+    },
+    "@year": {
+        "prefix": ["@year"],
+        "body": ["@year"],
+        "description": "returns the four digit year in which each observation begins. It is equivalent to “@datepart(@date, \"YYYY\")”."
+    },
+    "@quarter": {
+        "prefix": ["@quarter"],
+        "body": ["@quarter"],
+        "description": "returns the quarter of the year in which each observation begins. It is equivalent to “@datepart(@date, \"Q\")”."
+    },
+    "@month": {
+        "prefix": ["@month"],
+        "body": ["@month"],
+        "description": "returns the month of the year in which each observation begins. It is equivalent to “@datepart(@date, \"MM\")”."
+    },
+    "@day": {
+        "prefix": ["@day"],
+        "body": ["@day"],
+        "description": "returns the day of the month in which each observation begins. It is equivalent to “@datepart(@date, \"DD\")”."
+    },
+    "@weekday": {
+        "prefix": ["@weekday"],
+        "body": ["@weekday"],
+        "description": "returns the day of the week in which each observation begins, where Monday is given the number 1 and Sunday is given the number 7. It is equivalent to “@datepart(@date, \"W\")”."
+    },
+    "@hour": {
+        "prefix": ["@hour"],
+        "body": ["@hour"],
+        "description": "returns the hour associated with each observation as an integer. For example, 9:30AM returns 9, and 5:15PM returns 17."
+    },
+    "@minute": {
+        "prefix": ["@minute"],
+        "body": ["@minute"],
+        "description": "returns the minute associated with each observation as an integer. For example, 9:30PM returns 30."
+    },
+    "@second": {
+        "prefix": ["@second"],
+        "body": ["@second"],
+        "description": "returns the second associated with each observation as an integer."
+    },
+    "@hourf": {
+        "prefix": ["@hourf"],
+        "body": ["@hourf"],
+        "description": "returns the time associated with observation as a floating point hour. For example, 9:30AM returns 9.5, and 5:15PM returns 17.25."
+    },
+    "@strdate": {
+        "prefix": ["@strdate"],
+        "body": ["@strdate(${1:fmt})"],
+        "description": "returns the set of observation dates as strings, using the date format string fmt. See “Date Formats”for a discussion of date format strings."
+    },
+    "@seas": {
+        "prefix": ["@seas"],
+        "body": ["@seas(${1:season_number})"],
+        "description": "returns dummy variables based on the period within the current year in which each observation occurs, where the year is divided up according to the workfile frequency. For example, in a quarterly file, “@seas(1)”, “@seas(2)”, “@seas(3)”, and “@seas(4)” correspond to the set of dummy variables for the four quarters of the year. these expressions are equivalent (in the quarterly workfile) to “@quarter=1”, “@quarter=2”, “@quarter=3”, and “@quarter=4”, respectively."
+    },
+    "@isperiod": {
+        "prefix": ["@isperiod"],
+        "body": ["@isperiod(${1:arg})"],
+        "description": "returns dummy variables for whether each observation is in the specified period, where arg is a double quoted date or period number. Note that in dated workfiles, arg is rounded down to the workfile frequency prior to computation."
+    },
+    "@trend": {
+        "prefix": ["@trend"],
+        "body": ["@trend(${1:[\"base_date\"]})"],
+        "description": "returns a time trend that increases by one for each observation of the workfile. The optional base_date may be provided to indicate the starting date for the trend."
+    },
+    "@trendbr": {
+        "prefix": ["@trendbr"],
+        "body": ["@trendbr(${1:[\"base_date\"]})"],
+        "description": "returns a time trend (with optional break point) that increases by one for each observation of the workfile. The optional base_date may be provided to indicate the starting date for the trend. Trend values before base_date will be zero."
+    },
+    "@trendc": {
+        "prefix": ["@trendc"],
+        "body": ["@trendc(${1:[\"base_date\"]})"],
+        "description": "returns a calendar time trend that increases based on the number of calendar periods between successive observations. The optional base_date may be provided to indicate the starting date for the trend."
+    },
+    "@daycount": {
+        "prefix": ["@daycount"],
+        "body": ["@daycount(${1:[\"weekday_range\"]})"],
+        "description": "Returns the number of calendar days within each observation of the workfile. The optional weekday_range argument lets you specify certain days of the week to count. If only one weekday is provided, @daycount returns the number of times that particular weekday occurs within the observation. If two weekdays are provided, @daycount returns the number of times that any weekday between (and including) the two weekdays occurs within the observation."
+    },
+    "@before": {
+        "prefix": ["@before"],
+        "body": ["@before(${1:\"date\"})"],
+        "description": "returns a dummy variable with a value of 1 for each observation prior to date, and zero for every other observation. If an observation is partially before date (for example if you have a monthly workfile and specify a day as date), the fraction of the observation before date is returned."
+    },
+    "@after": {
+        "prefix": ["@after"],
+        "body": ["@after(${1:\"date\"})"],
+        "description": "returns a dummy variable with a value of 1 for each observation after, and including, date, and zero for every other observation. If an observation is partially before date (for example if you have a monthly workfile and specify a day as date), the fraction of the observation after and including date is returned."
+    },
+    "@during": {
+        "prefix": ["@during"],
+        "body": ["@during(${1:\"date1 date2\"})"],
+        "description": "returns a dummy variable with a value of 1 for each observation between date1 and date2 (inclusive), and zero for every other observation. If an observation partially covers the specified dates (for example if you have a monthly workfile and specify a pair of days in the same month), the fraction is returned."
+    },
+    "@event": {
+        "prefix": ["@event"],
+        "body": ["@event(${1:\"d1 [d2]\"[, b]})"],
+        "description": "The event function returns a variable containing the proportion of a one-off event covered by each observation. The event can be specified by a single date, or by a pair of dates to denote a date range. Syntax: @event(\"d1 [d2]\"[, b]) d1: string b: (optional) string Return: series where d1 and d2 are dates defining the one-off event specification and b is a basis specification."
+    },
+    "@holiday": {
+        "prefix": ["@holiday"],
+        "body": ["@holiday(${1:h[, b][, flag...]})"],
+        "description": "returns the proportion or identifier of an annual event covered by the observation, for each observation in the workfile. h: string, b: string, flag: (optional) string, Return: series where h is the holiday event specification, b is a basis specification, and flag is a calculation scaling flag."
+    },
+    "@holidayset": {
+        "prefix": ["@holidayset"],
+        "body": ["@holidayset(${1:h[, b][, flag...]})"],
+        "description": "returns the proportion or identifier of multiple annual events covered by the observation, for each observation in the workfile. h: string, b: string, flag: (optional) string, Return: series where h is one or more holiday event specifications, b is a basis specification, and flag is a calculation scaling flag."
+    },
+    "@inlist": {
+        "prefix": ["@inlist"],
+        "body": ["@inlist(${1:series, “list”})"],
+        "description": "returns a dummy variable with a value of 1 for each observation of series equal to one of the values specified in list. list should be a quoted, space delimited list of values. For example, @inlist(name, “John Jack Susan”) returns a dummy variable equal to 1 for each observation where name matches either “John”, “Jack” or “Susan”."
+    },
+    "@between": {
+        "prefix": ["@between"],
+        "body": ["@between(${1:series, val1, val2})"],
+        "description": "returns dummy variable equal to 1 for observations where series is greater than or equal to val1 and less than or equal to val2. For example, @between(X, 0.4, 0.6) returns a dummy variable equal to 1 for each observation of X satisfying ."
+    },
+    "@crossid": {
+        "prefix": ["@crossid"],
+        "body": ["@crossid"],
+        "description": "returns the cross-section index (cross-section number) of each observation."
+    },
+    "@cellid": {
+        "prefix": ["@cellid"],
+        "body": ["@cellid"],
+        "description": "returns the inner dimension index value for each observation. The index numbers identify the unique values of the inner dimension observed across all cross-sections. Thus, if the first cross-section has annual observations for 1990, 1992, 1994, and 1995, and the second cross-section has observations for 1990, 1995, and 1997, the corresponding @cellid values will be (1, 2, 3, 4) and (1, 4, 5), respectively."
+    },
+    "@obsid": {
+        "prefix": ["@obsid"],
+        "body": ["@obsid"],
+        "description": "returns the observation number within each panel cross section for each observation. @obsid is similar to @obsnum except that it resets to one whenever it crosses the seam between two adjacent cross sections."
+    },
+    "ar": {
+        "prefix": ["ar"],
+        "body": ["ar"],
+        "description": "autoregressive error specification."
+    },
+    "d": {
+        "prefix": ["d"],
+        "body": ["d"],
+        "description": "fractional difference specification."
+    },
+    "@expand": {
+        "prefix": ["@expand"],
+        "body": ["@expand"],
+        "description": "automatic dummy variables."
+    },
+    "ma": {
+        "prefix": ["ma"],
+        "body": ["ma"],
+        "description": "moving average error specification."
+    },
+    "na": {
+        "prefix": ["na"],
+        "body": ["na"],
+        "description": "not available (missing value) code."
+    },
+    "nrnd": {
+        "prefix": ["nrnd"],
+        "body": ["nrnd"],
+        "description": "normal random number generation."
+    },
+    "pdl": {
+        "prefix": ["pdl"],
+        "body": ["pdl"],
+        "description": "polynomial distributed lag specification."
+    },
+    "rnd": {
+        "prefix": ["rnd"],
+        "body": ["rnd"],
+        "description": "uniform random number generation."
+    },
+    "sar": {
+        "prefix": ["sar"],
+        "body": ["sar"],
+        "description": "seasonal autoregressive error specification."
+    },
+    "sma": {
+        "prefix": ["sma"],
+        "body": ["sma"],
+        "description": "seasonal moving average error specification."
+    },
+    "@wexpand": {
+        "prefix": ["@wexpand"],
+        "body": ["@wexpand"],
+        "description": "automatic dummy variables from strings."
+    }
+    
+}

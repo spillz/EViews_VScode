@@ -10,23 +10,62 @@
     "vscode": "^1.80.0"
   },
   "categories": [
-    "Programming Languages"
+    "Programming Languages",
+    "Snippets"
   ],
+  "main": "./out/extension.js",
+  "activationEvents": [],
   "repository": {
     "type": "git",
     "url": "https://github.com/spillz/EViews_VScode.git"
   },
   "contributes": {
-    "languages": [{
-      "id": "eviews-prg",
-      "aliases": ["EViews Programming Language", "eviews-prg"],
-      "extensions": [".prg"],
-      "configuration": "./language-configuration.json"
-    }],
-    "grammars": [{
-      "language": "eviews-prg",
-      "scopeName": "source.eviews",
-      "path": "./syntaxes/eviews-prg.tmLanguage.json"
-    }]
+    "languages": [
+      {
+        "id": "eviews-prg",
+        "aliases": [
+          "EViews Programming Language",
+          "eviews-prg"
+        ],
+        "extensions": [
+          ".prg"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "eviews-prg",
+        "scopeName": "source.eviews",
+        "path": "./syntaxes/eviews-prg.tmLanguage.json"
+      }
+    ],
+    "snippets": [
+      {
+        "language": "plaintext",
+        "path": "./snippets.json"
+      }
+    ],
+    "menus": {
+      "editor/title/run": []
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "pretest": "npm run compile && npm run lint",
+    "lint": "eslint src --ext ts",
+    "test": "node ./out/test/runTest.js"
+  },
+  "devDependencies": {
+    "@types/node": "^20.4.4",
+    "@types/vscode": "^1.80.0",
+    "@typescript-eslint/eslint-plugin": "^6.1.0",
+    "@typescript-eslint/parser": "^6.1.0",
+    "@vscode/test-electron": "^2.3.3",
+    "eslint": "^8.45.0",
+    "glob": "^10.3.3",
+    "typescript": "^5.1.6"
   }
 }

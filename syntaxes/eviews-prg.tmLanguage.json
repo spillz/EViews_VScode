@@ -82,7 +82,7 @@
 			  }
 			},
 			"match":
-			  "\\b(?i)(alpha|model|svector|coef|pool|sym|equation|rowvector|system|factor|sample|table|geomap|scalar|text|graph|series|userobj|group|spool|valmap|logl|sspace|var|matrix|string|vector)\\b\\s*\\b([a-zA-Z]\\w*?)\\b",
+			  "^\\s*\\b(?i)(alpha|model|svector|coef|pool|sym|equation|rowvector|system|factor|sample|table|geomap|scalar|text|graph|series|userobj|group|spool|valmap|logl|sspace|var|matrix|string|vector)\\b\\s*\\b(([_a-zA-Z]\\w*?|\\{\\%[_a-zA-Z]\\w*?\\})(\\w*|{\\%[_a-zA-Z]\\w*?\\})?)\\b",
 			"name": "object.definition"
 		},
 		"operators": {
