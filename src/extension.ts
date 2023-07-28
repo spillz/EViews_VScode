@@ -107,14 +107,19 @@ export function activate(context: vscode.ExtensionContext) {
           const word = document.getText(range).toLowerCase();
           const line = document.lineAt(position).text;
           const dottedRange = document.getWordRangeAtPosition(range.start, /[!%@]?(?:[a-zA-Z_]\w*|\{[%][a-zA-Z_]\w*\})+\./i)
-          console.log('completion word',word);
           if(word.endsWith('.') || !word.endsWith('.') && word.length>0 && dottedRange!=undefined) { //Trigger for method completion is either a . or beginning of a word after a .
             if(word.endsWith('.')) range = document.getWordRangeAtPosition(position);
             let obj = word.endsWith('.')? word : document.getText(dottedRange); //Extract the parent object name
             obj = obj.slice(0,obj.length-1).toLowerCase();
-            if(file.vars.has(obj.toUpperCase())) {
-              const type = file.vars.get(obj.toUpperCase())?.type.toLowerCase();
-              if(type!==undefined) {
+            const symbol = file.getSymbol(parserCollection, obj, position.line, true);
+            if(symbol) {
+              if(symbol.object instanceof ev.ParsedSub) {
+                return;
+              }
+              else if(symbol.object instanceof String || typeof(symbol.object)==='string') {
+                return;
+              } else { //Variable
+                const type = symbol.object.type.toLowerCase();
                 const capType = type[0].toUpperCase()+type.slice(1);
                 if(capType in eviewsGroups) {
                   for(let meth in eviewsGroups[capType]) {
@@ -192,11 +197,11 @@ export function activate(context: vscode.ExtensionContext) {
                 const scope = symbol.scope;
                 const capType = type[0].toUpperCase()+type.slice(1);
                 const concept = 'Commands';
-                if(type in eviewsGroups[concept]) {
-                  const info = eviewsGroups[concept][type];
+                if(`[${capType}]` in eviewsGroups[capType]) {
+                  const info = eviewsGroups[capType][`[${capType}]`];
                   const ci = new vscode.CompletionItem(name, vscode.CompletionItemKind.Function);
                   const fileInfo = file.file.toString()===symbol.file.toString()? '':`\n\n${symbol.file.toString()}`;
-                  ci.documentation = `${capType}: ${info.description}`+fileInfo;
+                  ci.documentation = `${info.description}`+fileInfo;
                   ci.detail = `${capType} ${name} (${scope})`;
                   ci.range = range;
                   items.push(ci);
@@ -226,10 +231,38 @@ export function activate(context: vscode.ExtensionContext) {
         _token: vscode.CancellationToken
       ): vscode.ProviderResult<vscode.Hover> {
         // const range = _document.getWordRangeAtPosition(_position, /[!%@]?[A-Za-z_]\w*/i);
-        const range = _document.getWordRangeAtPosition(_position, /[!%@]?([a-zA-Z_]\w*|\{[%][a-zA-Z_]\w*\})+/i);
+        let range = _document.getWordRangeAtPosition(_position, /[!%@]?([a-zA-Z_]\w*|\{[%!][a-zA-Z_]\w*\})+/i);
         if(range!==undefined) {
           const word = _document.getText(range).toLowerCase();
+          const dottedRange = _document.getWordRangeAtPosition(range.start, /[!%@]?(?:[a-zA-Z_]\w*|\{[%][a-zA-Z_]\w*\})+\./i)
           console.log(`EView Lang: word at cursor ${word}`);
+          if(word.length>0 && dottedRange!=undefined) { //Trigger for method completion is either a . or beginning of a word after a .
+            let obj = _document.getText(dottedRange); //Extract the parent object name
+            obj = obj.slice(0,obj.length-1).toLowerCase();
+            const file = parserCollection.files[_document.uri.toString()];
+            const symbol = file.getSymbol(parserCollection, obj, _position.line, true);
+            if(symbol) {
+              if(symbol.object instanceof ev.ParsedSub) {
+                return;
+              }
+              else if(symbol.object instanceof String || typeof(symbol.object)==='string') {
+                return;
+              } else { //Variable
+                const type = symbol.object.type.toLowerCase();
+                const capType = type[0].toUpperCase()+type.slice(1);
+                if(capType in eviewsGroups) {
+                  if(word in eviewsGroups[capType]) {
+                    const info = eviewsGroups[capType][word];
+                    const desc = `${capType} method ${word}`+'\n\n'+info['description'];
+                    const usage = info['usage'];
+                    const contents = new vscode.MarkdownString(`${capType}: ${word}\n\nUsage: ${usage}\n\n${desc}\n\nEviews help: [${word}](${docUri(info)})`);
+                    contents.isTrusted = true;
+                    return new vscode.Hover(contents);
+                  }
+                }  
+              }
+            }
+          }
           for(let concept of ['Programming','Commands','Element Information','Functions','Operators','General Information','Basic Workfile Functions','Dated Workfile Information','Panel Workfile Functions']) {
             if(word in eviewsGroups[concept]) {
               const info = eviewsGroups[concept][word];
@@ -266,27 +299,14 @@ export function activate(context: vscode.ExtensionContext) {
               const scope = symbol.scope;
               const capType = type[0].toUpperCase()+type.slice(1);
               const concept = 'Commands';
-              if(type in eviewsGroups[concept]) {
-                const info = eviewsGroups[concept][type];
+              if(`[${capType}]` in eviewsGroups[capType]) {
+                const info = eviewsGroups[capType][`[${capType}]`];
                 const desc = info.description;
-                const contents = new vscode.MarkdownString(`${capType} ${word} (${scope})\n\n${capType}: ${desc}\n\nEviews help: [${capType}](${docUri(info)})`);  
+                const contents = new vscode.MarkdownString(`${capType} ${word} (${scope})\n\n${desc}\n\nEviews help: [${capType}](${docUri(info)})`);  
                 contents.isTrusted = true;
                 return new vscode.Hover(contents);
               }
             }
-            const type = file.vars.get(word.toUpperCase())?.type.toLowerCase();
-            if(type!==undefined) {
-              const capType = type[0].toUpperCase()+type.slice(1);
-              const concept = 'Commands';
-              if(type in eviewsGroups[concept]) {
-                const info = eviewsGroups[concept][type];
-                const desc = info.description;
-                const contents = new vscode.MarkdownString(`${capType} ${word} (global)\n\n${capType}: ${desc}\n\nEviews help: [${capType}](${docUri(info)})`);  
-                contents.isTrusted = true;
-                return new vscode.Hover(contents);
-              }
-            }
-
           }
         } else {
         // To enable command URIs in Markdown content, you must set the `isTrusted` flag.
