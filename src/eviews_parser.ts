@@ -70,8 +70,9 @@ export class ParsedSub {
                 if(!this.calls.includes(call)) {
                     this.calls.push(call);
                 }
+                continue
             }
-            const match = lsu.match(/([%!][A-Z_]\w*)[ \t]*=.*/);
+            const match = lsu.match(/^([%!][A-Z_]\w*)\s*=.*/);
             if (match) {
                 const vname = match[1];
                 if (!this.vars.has(vname) && !this.args.has(vname)) {
@@ -93,9 +94,9 @@ export class ParsedSub {
                 }
                 continue
             }
-            for(const objectName in eviewsTypes) {
+            for(const objectName of eviewsTypes) {
                 if(lsu.startsWith(objectName)) {
-                    const match = lsu.slice(objectName.length).match(/([A-Z_]\w*)/)
+                    const match = lsu.slice(objectName.length).match(/^(?:\(.*\))?\s*((\{[%!][a-zA-Z_]\w*\}|[a-zA-Z_]\w*)+)/) //TODO: this will pick up objects defined by commands like vector(n) vecname{!i}_t
                     if(match) {
                         if (!this.vars.has(match[1]) && !this.args.has(match[1])) {
                             this.vars.push(v(objectName, match[1]))
@@ -158,12 +159,14 @@ export class ParsedFile {
 
     getAllSymbols(collection: ParsedRoutinesCollection, line:number|null = null, followIncludes:boolean=false): Symbol[] {
         let symbols:Symbol[] = [];
-        for (const v of this.vars) symbols.push({object:v, file:this.file, scope:'global'});
         for(let s of this.subroutines) {
             if(line!=null && line>s.start && line<s.end) {
-                for(const a in s.args) symbols.push({object:a, file:this.file, scope:'subroutine argument'});
+                for(const a of s.args) symbols.push({object:a, file:this.file, scope:'subroutine argument'});
             }
-            for(const v in s.args) symbols.push({object:v, file:this.file, scope:'subroutine global'});
+        }
+        for (const v of this.vars) symbols.push({object:v, file:this.file, scope:'global'});
+        for(let s of this.subroutines) {
+            for(const v of s.vars) symbols.push({object:v, file:this.file, scope:'subroutine-defined global'});
             symbols.push({object:s, file:this.file, scope:'global'})
         }
         if(followIncludes) {
@@ -178,17 +181,19 @@ export class ParsedFile {
 
     getSymbol(collection: ParsedRoutinesCollection, name:string, line:number|null = null, followIncludes:boolean=false): Symbol|undefined {
         name = name.toUpperCase();
-        if(this.vars.has(name)) {
-            return {object:this.vars.get(name)!, file:this.file, scope:'global'};
-        }
         for(let s of this.subroutines) {
-            if(line!=null && line>s.start && line<s.end) {
+            if(line!=null && line>=s.start && line<s.end) {
                 if(s.args.has(name)) {
                     return {object:s.args.get(name)!, file:this.file, scope:'subroutine argument'};
                 }
             }
-                if(s.vars.has(name)) {
-                return {object:s.vars.get(name)!, file:this.file, scope:'subroutine global'};
+        }
+        if(this.vars.has(name)) {
+            return {object:this.vars.get(name)!, file:this.file, scope:'global'};
+        }
+        for(let s of this.subroutines) {
+            if(s.vars.has(name)) {
+                return {object:s.vars.get(name)!, file:this.file, scope:'subroutine-defined global'};
             }
             if(name == s.name) {
                 return {object:s, file:this.file, scope:'global'}
@@ -284,13 +289,10 @@ export class ParsedFile {
                 let args:VariableArray = new VariableArray();
                 [sub, argPart] = lsu.slice(10).split('(', 2);
                 sub = sub.trim();
-                argPart = argPart.split(')',1)[0];
-                while(argPart.length>0) {
-                    let arg:string;
-                    [arg, argPart] = argPart.split(',',2);
-                    arg = arg.trim();
-                    argPart = argPart? argPart.trim():'';
-                    let argDef = arg.match(/(\w+)\s([%!][A-Z_]\w*)/)
+                const sargs = argPart.split(')',1)[0].split(',');
+                for(let sarg of sargs) {
+                    sarg = sarg.trim();
+                    let argDef = sarg.match(/(\w+)\s([%!][A-Z_]\w*)/)
                     if(argDef) {
                         args.push(v(argDef[1], argDef[2])); //argDef[1] contains the type. Check it is a valid one
                     } //track error if no match
@@ -337,7 +339,7 @@ export class ParsedFile {
             }
             for(const objectName of eviewsTypes) {
                 if(lsu.startsWith(objectName)) {
-                    const match = lsu.slice(objectName.length).match(/([A-Z_]\w*)/)
+                    const match = lsu.slice(objectName.length).match(/^(?:\(.*\))?\s*(([a-zA-Z_]\w*|\{[%!][a-zA-Z_]\w*\})+)/); //TODO: this will pick up commands like vector(n) vecname{!i}_t
                     if(match && !this.vars.has(match[1])) {
                         this.vars.push(v(objectName, match[1]));
                     }

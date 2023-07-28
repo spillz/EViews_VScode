@@ -101,12 +101,12 @@ export function activate(context: vscode.ExtensionContext) {
         token: CancellationToken, 
         context: vscode.CompletionContext): vscode.ProviderResult<vscode.CompletionItem[] | vscode.CompletionList<vscode.CompletionItem>> {
         const items:vscode.CompletionItem[] = [];
-        let range = document.getWordRangeAtPosition(position, /([!%@]|[!%@]?(?:[a-zA-Z_]\w*|\{[%][a-zA-Z_]\w*\})+\.?)/i);
+        let range = document.getWordRangeAtPosition(position, /([!%@]?(?:\{[%!][a-zA-Z_]\w*\}|[a-zA-Z_]\w*)(?:\{[%!][a-zA-Z_]\w*\}|\w*)*\.?|[!%@])/i);
         const file = parserCollection.files[document.uri.toString()];
         if(range!==undefined) {
           const word = document.getText(range).toLowerCase();
           const line = document.lineAt(position).text;
-          const dottedRange = document.getWordRangeAtPosition(range.start, /[!%@]?(?:[a-zA-Z_]\w*|\{[%][a-zA-Z_]\w*\})+\./i)
+          const dottedRange = document.getWordRangeAtPosition(range.start, /[!%@]?(?:\{[%!][a-zA-Z_]\w*\}|[a-zA-Z_]\w*)(?:\{[%!][a-zA-Z_]\w*\}|\w*)*\./i)
           if(word.endsWith('.') || !word.endsWith('.') && word.length>0 && dottedRange!=undefined) { //Trigger for method completion is either a . or beginning of a word after a .
             if(word.endsWith('.')) range = document.getWordRangeAtPosition(position);
             let obj = word.endsWith('.')? word : document.getText(dottedRange); //Extract the parent object name
@@ -123,6 +123,7 @@ export function activate(context: vscode.ExtensionContext) {
                 const capType = type[0].toUpperCase()+type.slice(1);
                 if(capType in eviewsGroups) {
                   for(let meth in eviewsGroups[capType]) {
+                    if(meth[0]==='[') continue; //Skip the object definition entry, it's not a method
                     const ci = new vscode.CompletionItem(meth, vscode.CompletionItemKind.Method);
                     ci.documentation = `${capType} method ${meth}`+'\n\n'+eviewsGroups[capType][meth]['description'];
                     ci.detail = eviewsGroups[capType][meth]['usage'];
@@ -134,11 +135,11 @@ export function activate(context: vscode.ExtensionContext) {
               }
             }
             if(items.length==0) {
-              const ci = new vscode.CompletionItem('<No methods for unknown object type>', vscode.CompletionItemKind.Method);
+              const ci = new vscode.CompletionItem('<No methods available for unknown object type>', vscode.CompletionItemKind.Method);
               items.push(ci);
             }
           } else {
-            for(let concept of ['Programming','Commands']) {
+            for(let concept of ['Programming','Commands']) { //Commands -- todo, these should only trigger at the start of a line
               for(const kw in eviewsGroups[concept]) {
                 if(kw[0]=='[') continue;
                 const ci = new vscode.CompletionItem(kw, vscode.CompletionItemKind.Keyword);
@@ -170,7 +171,7 @@ export function activate(context: vscode.ExtensionContext) {
               //   }
               }
             }
-            const symbols = file.getAllSymbols(parserCollection, document.lineAt(position).lineNumber, true);
+            const symbols = file.getAllSymbols(parserCollection, position.line, true);
             for(const symbol of symbols) {
               if(symbol.object instanceof ev.ParsedSub) {
                 const name = symbol.object.name.toLowerCase();
@@ -231,12 +232,12 @@ export function activate(context: vscode.ExtensionContext) {
         _token: vscode.CancellationToken
       ): vscode.ProviderResult<vscode.Hover> {
         // const range = _document.getWordRangeAtPosition(_position, /[!%@]?[A-Za-z_]\w*/i);
-        let range = _document.getWordRangeAtPosition(_position, /[!%@]?([a-zA-Z_]\w*|\{[%!][a-zA-Z_]\w*\})+/i);
+        let range = _document.getWordRangeAtPosition(_position, /[!%@]?(?:\{[%!][a-zA-Z_]\w*\}|[a-zA-Z_]\w*)(?:\{[%!][a-zA-Z_]\w*\}|\w*)*/i);
         if(range!==undefined) {
           const word = _document.getText(range).toLowerCase();
-          const dottedRange = _document.getWordRangeAtPosition(range.start, /[!%@]?(?:[a-zA-Z_]\w*|\{[%][a-zA-Z_]\w*\})+\./i)
+          const dottedRange = _document.getWordRangeAtPosition(range.start, /[!%@]?(?:\{[%!][a-zA-Z_]\w*\}|[a-zA-Z_]\w*)(?:\{[%!][a-zA-Z_]\w*\}|\w*)*\./i)
           console.log(`EView Lang: word at cursor ${word}`);
-          if(word.length>0 && dottedRange!=undefined) { //Trigger for method completion is either a . or beginning of a word after a .
+          if(word.length>0 && dottedRange!=undefined) { //Trigger for method info hover is two adjoining words separated by a . -- todo: don't hover if the word to the left starts with @
             let obj = _document.getText(dottedRange); //Extract the parent object name
             obj = obj.slice(0,obj.length-1).toLowerCase();
             const file = parserCollection.files[_document.uri.toString()];
@@ -253,15 +254,17 @@ export function activate(context: vscode.ExtensionContext) {
                 if(capType in eviewsGroups) {
                   if(word in eviewsGroups[capType]) {
                     const info = eviewsGroups[capType][word];
-                    const desc = `${capType} method ${word}`+'\n\n'+info['description'];
+                    const header = `${capType} method ${word}`;
+                    const desc = info['description'];
                     const usage = info['usage'];
-                    const contents = new vscode.MarkdownString(`${capType}: ${word}\n\nUsage: ${usage}\n\n${desc}\n\nEviews help: [${word}](${docUri(info)})`);
+                    const contents = new vscode.MarkdownString(`${header}\n\nUsage: ${usage}\n\n${desc}\n\nEviews help: [${word}](${docUri(info)})`);
                     contents.isTrusted = true;
                     return new vscode.Hover(contents);
                   }
                 }  
               }
             }
+            return new vscode.Hover(new vscode.MarkdownString(`Unknown method of unknown object ${obj}`));
           }
           for(let concept of ['Programming','Commands','Element Information','Functions','Operators','General Information','Basic Workfile Functions','Dated Workfile Information','Panel Workfile Functions']) {
             if(word in eviewsGroups[concept]) {
@@ -273,7 +276,7 @@ export function activate(context: vscode.ExtensionContext) {
             }
           }
           const file = parserCollection.files[_document.uri.toString()];
-          const symbol = file.getSymbol(parserCollection, word, _document.lineAt(_position).lineNumber, true);
+          const symbol = file.getSymbol(parserCollection, word, _position.line, true);
           if(symbol) {
             if(symbol.object instanceof ev.ParsedSub) {
               const name = symbol.object.name;
@@ -308,18 +311,19 @@ export function activate(context: vscode.ExtensionContext) {
               }
             }
           }
-        } else {
-        // To enable command URIs in Markdown content, you must set the `isTrusted` flag.
-        // When creating trusted Markdown string, make sure to properly sanitize all the
-        // input content so that only expected command URIs can be executed
-          const commentCommandUri = vscode.Uri.parse(`command:editor.action.addCommentLine`);
-          const contents = new vscode.MarkdownString(`[Add comment](${commentCommandUri})`);
-          contents.isTrusted = true;
-          console.log(`EVIews Lang hover: ${contents}`);
+        } 
+        // else {
+        // // To enable command URIs in Markdown content, you must set the `isTrusted` flag.
+        // // When creating trusted Markdown string, make sure to properly sanitize all the
+        // // input content so that only expected command URIs can be executed
+        //   const commentCommandUri = vscode.Uri.parse(`command:editor.action.addCommentLine`);
+        //   const contents = new vscode.MarkdownString(`[Add comment](${commentCommandUri})`);
+        //   contents.isTrusted = true;
+        //   console.log(`EVIews Lang hover: ${contents}`);
   
-          return new vscode.Hover(contents);
+        //   return new vscode.Hover(contents);
 
-        }
+        // }
 
       }
     })()
