@@ -126,7 +126,7 @@ export function activate(context: vscode.ExtensionContext) {
                     if(meth[0]==='[') continue; //Skip the object definition entry, it's not a method
                     const ci = new vscode.CompletionItem(meth, vscode.CompletionItemKind.Method);
                     ci.documentation = `${capType} method ${meth}`+'\n\n'+eviewsGroups[capType][meth]['description'];
-                    ci.detail = eviewsGroups[capType][meth]['usage'];
+                    ci.detail = eviewsGroups[capType][meth]['usage'].split('\n').join(' | ');
                     ci.range = range;
                     ci.preselect = true;
                     items.push(ci);        
@@ -144,15 +144,9 @@ export function activate(context: vscode.ExtensionContext) {
                 if(kw[0]=='[') continue;
                 const ci = new vscode.CompletionItem(kw, vscode.CompletionItemKind.Keyword);
                 ci.documentation = eviewsGroups[concept][kw]['description'];
-                ci.detail = eviewsGroups[concept][kw]['usage'];
+                ci.detail = eviewsGroups[concept][kw]['usage'].split('\n').join(' | ');
                 ci.range = range;
                 items.push(ci);  
-              // if(kw.toLowerCase().startsWith(word.toLowerCase())) {
-              //     const ci = new vscode.CompletionItem(kw, vscode.CompletionItemKind.Keyword);
-              //     ci.documentation = eviewsGroups[concept][kw]['description'];
-              //     ci.detail = eviewsGroups[concept][kw]['usage'];
-              //     items.push(ci);  
-              //   }
               }
             }
             for(let concept of ['Element Information','Functions','Operators','General Information','Basic Workfile Functions','Dated Workfile Information','Panel Workfile Functions']) {
@@ -160,15 +154,9 @@ export function activate(context: vscode.ExtensionContext) {
                 if(kw[0]=='[') continue;
                 const ci = new vscode.CompletionItem(kw, vscode.CompletionItemKind.Function);
                 ci.documentation = eviewsGroups[concept][kw]['description'];
-                ci.detail = eviewsGroups[concept][kw]['usage'];
+                ci.detail = eviewsGroups[concept][kw]['usage'].split('\n').join(' | ');
                 ci.range = range;
                 items.push(ci);
-              // if(kw.toLowerCase().startsWith(word.toLowerCase())) {
-              //     const ci = new vscode.CompletionItem(kw, vscode.CompletionItemKind.Keyword);
-              //     ci.documentation = eviewsGroups[concept][kw]['description'];
-              //     ci.detail = eviewsGroups[concept][kw]['usage'];
-              //     items.push(ci);  
-              //   }
               }
             }
             const symbols = file.getAllSymbols(parserCollection, position.line, true);
@@ -223,7 +211,102 @@ export function activate(context: vscode.ExtensionContext) {
     '%',
     '!',
   );
-  const hprov = vscode.languages.registerHoverProvider(
+    context.subscriptions.push(
+      vscode.languages.registerSignatureHelpProvider(
+        'eviews-prg',
+        {
+          provideSignatureHelp(document: vscode.TextDocument, position: vscode.Position, token: vscode.CancellationToken, context: vscode.SignatureHelpContext) {
+            if(context.activeSignatureHelp!==undefined) {
+              if(context.triggerCharacter==',') {
+                context.activeSignatureHelp.activeParameter++;
+                return context.activeSignatureHelp;
+              }
+            }
+            const range = document.getWordRangeAtPosition(position, /((?:\{[%!][a-zA-Z_]\w*\}|[a-zA-Z_]\w*)(?:\{[%!][a-zA-Z_]\w*\}|\w*)*\.)?([@]?[A-Z_]\w*)([( ].*)/i);
+            const funcText = document.getText(range);
+            const funcMatch = funcText.match(/((?:\{[%!][a-zA-Z_]\w*\}|[a-zA-Z_]\w*)(?:\{[%!][a-zA-Z_]\w*\}|\w*)*\.)?([@]?[A-Z_]\w*)([( ].*)/i);
+            if (funcMatch) {
+              const file = parserCollection.files[document.uri.toString()];
+              let callData:KeywordInfo|undefined = undefined;
+              let callName;
+              let obj:string;
+              let capType:string;
+              let argPart: string;
+              let concept: string;
+              if(funcMatch[1]!==undefined) { //method call
+                obj = funcMatch[1].slice(0, funcMatch[1].length-1);
+                callName = funcMatch[2].toLowerCase();
+                argPart = funcMatch[3];
+                concept = `${obj} method`;
+                const symbol = file.getSymbol(parserCollection, obj, position.line, true);
+                if(symbol) {
+                  if(!(symbol.object instanceof ev.ParsedSub) && !(symbol.object instanceof String) && !(typeof(symbol.object)==='string')) {
+                    const type = symbol.object.type.toLowerCase();
+                    capType = type[0].toUpperCase()+type.slice(1);
+                    if(capType in eviewsGroups) {
+                      if(callName in eviewsGroups[capType]) {
+                        callData = eviewsGroups[capType][callName];
+                      }
+                    }  
+                  }
+                }
+              }
+              else { //function call or a command
+                const callName = funcMatch[2].toLowerCase();
+                const argPart = funcMatch[3];
+                for(concept of ['Programming','Commands','Element Information','Functions','Operators','General Information','Basic Workfile Functions','Dated Workfile Information','Panel Workfile Functions']) {
+                  if(callName in eviewsGroups[concept]) {
+                    callData = eviewsGroups[concept][callName];
+                    break;
+                  }   
+                }                               
+              }
+              const signatureHelp = new vscode.SignatureHelp();
+              if(callData===undefined) return;
+              const sigString = callData['usage'].trim()
+              if(sigString.toUpperCase().startsWith('SYNTAX:')) {
+                const sigParts = sigString.split('\n');
+                if(sigParts.length>0) {
+                  const sig = new vscode.SignatureInformation(sigParts[0].slice(7).trim())
+                  for(let arg of sigParts.slice(1)) {
+                    sig.parameters.push(new vscode.ParameterInformation(arg.trim()))
+                  }
+                  signatureHelp.signatures.push(sig);
+                }  
+              }
+              else if(sigString.split('\n').length==1) {
+                const sig = new vscode.SignatureInformation(sigString)
+                const argMatch = sigString.match(/\(.*\)/i)
+                if(argMatch) {
+                  for(let arg of argMatch[0].split(',')) {
+                    sig.parameters.push(new vscode.ParameterInformation(arg.trim()))
+                  }  
+                  signatureHelp.signatures.push(sig);
+                }
+              } //TODO: Other types of usage completions
+              else {
+                console.log('Unparseable args', sigString)
+                const sigs = sigString.split('\n');
+                for(const s of sigs) {
+                  const sig = new vscode.SignatureInformation(s.trim());
+                  const argMatch = sigString.match(/\(.*\)/i)
+                  if(argMatch) {
+                    for(let arg of argMatch[0].split(',')) {
+                      sig.parameters.push(new vscode.ParameterInformation(arg.trim()))
+                    }
+                  }  
+                  signatureHelp.signatures.push(sig);  
+                }
+              }
+              signatureHelp.activeParameter = 0;
+              return signatureHelp;
+            }
+          }
+        },
+        '(', ',', ' ', '\t'  // trigger characters
+      )
+    );
+    const hprov = vscode.languages.registerHoverProvider(
     'eviews-prg',
     new (class implements vscode.HoverProvider {
       provideHover(
