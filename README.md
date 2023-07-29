@@ -23,3 +23,7 @@ Improved indentation and folding
 ### 0.2.0
 
 Intellisense and hover for definitions. Integrates with EViews webhelp but provides short definitions in hover/completion resolvers for offline use
+
+### 0.2.1
+
+Basic signature help for commands, functions and methods  

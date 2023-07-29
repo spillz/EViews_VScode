@@ -5,7 +5,7 @@
   "icon": "icon.png",
   "publisher": "dlmprod",
   "license": "MIT License",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "engines": {
     "vscode": "^1.80.0"
   },
@@ -42,7 +42,7 @@
     ],
     "snippets": [
       {
-        "language": "plaintext",
+        "language": "eviews-prg",
         "path": "./snippets.json"
       }
     ],

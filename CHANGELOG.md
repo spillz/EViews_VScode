@@ -17,3 +17,7 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 - Hover and intellisense
 - Completions on reserved words and objects defined in program and includes
 - Hover and some comlpetions includes links to EViews help
+
+## [0.2.1] - 7/29/2023
+
+ - Basic signature help
