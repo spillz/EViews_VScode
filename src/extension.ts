@@ -2,9 +2,8 @@ import { CancellationToken, Position, TextDocument, Uri } from 'vscode';
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
-import { Key } from 'readline';
-import { eventNames } from 'process';
 import * as ev from './eviews_parser';
+import { describe } from 'node:test';
 
 export const Exec_In_Terminal_Icon = 'eviews.execInTerminal-icon';
 
@@ -13,6 +12,167 @@ export const Exec_In_Terminal_Icon = 'eviews.execInTerminal-icon';
 //     ['vscode.openWith']: [Uri, string];
 //     [Exec_In_Terminal_Icon]: [Uri, string];
 // }
+
+type Snip = {
+  [id:string]: {prefix:string, body:string[], usage:string, description:string}
+}
+
+const program_snippets:{[keyword:string]:Snip} = {
+  "for": {
+    "For Loop Scalar": {
+      "prefix": "for#int",
+      "body": ["for ${1:!var} = ${2:!start} to ${3:!end} ${4:[step !n]}", "\t$0", "next"],
+      "usage": "for !var = !start to !end ...",
+      "description": "Loop over values in a range."
+    },
+    "For Loop String": {
+      "prefix": "for#string",
+      "body": ["for ${1:%s} ${2:{%space_sep_string\\}}", "\t$0", "next"],
+      "usage": "for %s {%space_sep_string} ...",
+      "description": "Loop over string values in a string list."
+    },
+  },
+  "if": {
+    "If": {
+      "prefix": "if",
+      "body": ["if ${1:condition} then", "\t$0", "endif"],
+      "usage": "if <condition> then ...",
+      "description": "An if block."
+    },
+    "If Else": {
+      "prefix": "if#else",
+      "body": ["if ${1:condition} then", "\t$2", "else", "\t$0", "endif"],
+      "usage": "if <condition> then... else ...",
+      "description": "An if else block."
+    },
+  },
+  "else": {
+    "Else": {
+      "prefix": "else",
+      "body": ["else"],
+      "usage": "else",
+      "description": "Else part of if statement."
+    },  
+  },
+  "endif": {
+    "Endif": {
+      "prefix": "endif",
+      "body": ["endif"],
+      "usage": "endif",
+      "description": "End of if statement."
+    },  
+  },
+  "while": {
+    "While": {
+      "prefix": "while",
+      "body": ["while ${1:condition}", "\t$0", "wend"],
+      "usage": "while <condition> ...",
+      "description": "A while loop."
+    },  
+  },
+  "wend": {
+    "Wend": {
+      "prefix": "wend",
+      "body": ["wend"],
+      "usage": "wend",
+      "description": "End of while loop."
+    },  
+  },
+  "subroutine": {
+    "Subroutine": {
+      "prefix": "subroutine",
+      "body": ["subroutine ${1:sub_name}${2:(type1 arg1, type2 arg2, ...)}", "\t$0", "endsub"],
+      "usage": "subroutine <sub_name>[(<arg1>, <arg2>, ...)] ...",
+      "description": "Subroutine definition."
+    },  
+  },
+  "endsub": {
+    "Subroutine": {
+      "prefix": "ensub",
+      "body": ["endsub"],
+      "usage": "endsub",
+      "description": "Subroutine end."
+    },  
+  },
+  "call": {
+    "Call": {
+      "prefix": "call",
+      "body": ["call ${1:sub_name}"],
+      "usage": "call <sub_name>[(<arg1>, <arg2>, ...)]",
+      "description": "A subroutine call."
+    }  
+  }
+}
+
+type SigData = {
+  call:string,
+  args:Array<{label:string, description?:string}>  
+}
+
+function getParamLoc(argPart:string): number {
+  let i=0;
+  let argLoc = 0;
+  let parenLevel = 0;
+  let quoteLevel = 0;
+  argPart = argPart.slice(1);
+  while(i<argPart.length) {
+    if(argPart[i]===',' && parenLevel===0 && quoteLevel===0) {
+      argLoc++;
+    }
+    if(argPart[i]==="'" && quoteLevel===0) {
+      return argLoc;
+    }
+    if(argPart[i]==='"') {
+      quoteLevel = quoteLevel===0?1:0;
+    }
+    if(argPart[i]==='(' && quoteLevel===0) {
+      parenLevel++;
+    }
+    if(argPart[i]===')' && quoteLevel===0) {
+      parenLevel--;
+    }
+    if(parenLevel<0) {
+      return argLoc;
+    }
+    i++;
+  }
+  return argLoc;
+}
+
+function subSigData(sub:ev.ParsedSub):SigData {
+  const argPart = sub.args.map((a)=>`${a.type.toLowerCase()} ${a.name.toLowerCase()}`).join(', ');
+  const call = sub.args.length>0? `call ${sub.name.toLowerCase()}(${argPart})`:`call ${sub.name.toLowerCase()}`;
+  const args = sub.args.map((a)=>{return {label:a.name.toLowerCase(), description:`${a.type.toLowerCase()} ${a.name.toLowerCase()}`};})
+  return {
+    call: call,
+    args: args,
+  };
+}
+
+function usageSnippets(usage:string, kw:string):Array<[string, vscode.SnippetString]> {
+  const snippets:Array<[string, vscode.SnippetString]> = [];
+  for(let use of usage.split('\n')) {
+    const k = use.indexOf(kw);
+    if(k===undefined) continue
+    let options = use.slice(k+kw.length);
+    let new_use = use.slice(0,k+kw.length);
+    let i = 1;
+    while(true) {
+      const match = options.match(/^([\s(),]*)([^\s^[^\]^(^)^,]+|\[.*?\])/);
+      if(!match) break;
+      options = options.slice(match[0].length);
+      if(match[2][0]=='@') {
+        new_use = new_use+match[0];
+      } else {
+        new_use = new_use+match[1]+'${'+String(i)+':'+match[2]+'}';
+      }
+      i++;
+    }
+    snippets.push([use, new vscode.SnippetString(new_use)]);
+  }  
+  return snippets;
+}
+
 
 type KeywordInfo = {
   usage: string,
@@ -50,8 +210,15 @@ export function activate(context: vscode.ExtensionContext) {
     const kwds = Object.keys(keywordData[grp])
     for(let kwd of kwds) {
       const kwjson = keywordData[grp][kwd]
+      let use:string = kwjson.usage??'';
+      use = use.replace(/  /g,' ');
+      use = use.replace(/ \(/g,'(');
+      use = use.replace(/\( /g,'(');
+      use = use.replace(/ \)/g,')');
+      use = use.replace(/\[ /g,'[');
+      use = use.split('\n').map((u)=>u.replace(RegExp('^.*?\\.\\s*('+kwd+')'), '$1')).join('\n');
       const kwinfo: KeywordInfo = {
-        usage: kwjson.usage??'',
+        usage: use,
         description: kwjson.description??'',
         longDescription: kwjson.long_description??'',
         uri: kwjson.uri??'',
@@ -104,6 +271,7 @@ export function activate(context: vscode.ExtensionContext) {
         let range = document.getWordRangeAtPosition(position, /([!%@]?(?:\{[%!][a-zA-Z_]\w*\}|[a-zA-Z_]\w*)(?:\{[%!][a-zA-Z_]\w*\}|\w*)*\.?|[!%@])/i);
         const file = parserCollection.files[document.uri.toString()];
         if(range!==undefined) {
+          const linePrefix = document.lineAt(position.line).text.slice(0,range.start.character)
           const word = document.getText(range).toLowerCase();
           const line = document.lineAt(position).text;
           const dottedRange = document.getWordRangeAtPosition(range.start, /[!%@]?(?:\{[%!][a-zA-Z_]\w*\}|[a-zA-Z_]\w*)(?:\{[%!][a-zA-Z_]\w*\}|\w*)*\./i)
@@ -123,13 +291,26 @@ export function activate(context: vscode.ExtensionContext) {
                 const capType = type[0].toUpperCase()+type.slice(1);
                 if(capType in eviewsGroups) {
                   for(let meth in eviewsGroups[capType]) {
+                    const info = eviewsGroups[capType][meth]
                     if(meth[0]==='[') continue; //Skip the object definition entry, it's not a method
-                    const ci = new vscode.CompletionItem(meth, vscode.CompletionItemKind.Method);
-                    ci.documentation = `${capType} method ${meth}`+'\n\n'+eviewsGroups[capType][meth]['description'];
-                    ci.detail = eviewsGroups[capType][meth]['usage'].split('\n').join(' | ');
-                    ci.range = range;
-                    ci.preselect = true;
-                    items.push(ci);        
+                    if(meth[0]==='@') {
+                      const ci = new vscode.CompletionItem(meth, vscode.CompletionItemKind.Method);
+                      ci.documentation = `${capType} method ${meth}`+'\n\n'+info['description']+`\n\nEviews help: [${capType}](${docUri(info)})`;
+                      ci.detail = eviewsGroups[capType][meth]['usage'].split('\n').join(' | ');
+                      ci.range = range;
+                      ci.preselect = true;
+                      items.push(ci);          
+                    } else {
+                      for(const use of usageSnippets(eviewsGroups[capType][meth]['usage'], meth)) {
+                        const ci = new vscode.CompletionItem(meth, vscode.CompletionItemKind.Method);
+                        ci.documentation = `${capType} method ${meth}`+'\n\n'+info['description']+`\n\nEviews help: [${capType}](${docUri(info)})`;
+                        ci.detail = use[0];
+                        ci.range = range;
+                        ci.insertText = use[1];
+                        ci.preselect = true;
+                        items.push(ci);            
+                      }
+                    }
                   }
                 }
               }
@@ -139,21 +320,42 @@ export function activate(context: vscode.ExtensionContext) {
               items.push(ci);
             }
           } else {
-            for(let concept of ['Programming','Commands']) { //Commands -- todo, these should only trigger at the start of a line
-              for(const kw in eviewsGroups[concept]) {
-                if(kw[0]=='[') continue;
-                const ci = new vscode.CompletionItem(kw, vscode.CompletionItemKind.Keyword);
-                ci.documentation = eviewsGroups[concept][kw]['description'];
-                ci.detail = eviewsGroups[concept][kw]['usage'].split('\n').join(' | ');
-                ci.range = range;
-                items.push(ci);  
-              }
+            if(linePrefix.trim().length==0) {
+              for(let concept of ['Programming','Commands']) { //Commands -- todo, these should only trigger at the start of a line
+                for(const kw in eviewsGroups[concept]) {
+                  if(kw[0]=='[') continue;
+                  const info = eviewsGroups[concept][kw];
+                  if(kw in program_snippets) {
+                    const snips = program_snippets[kw];
+                    for(const s in snips) {
+                      const snipData = snips[s];
+                      const ci = new vscode.CompletionItem(snipData["prefix"], vscode.CompletionItemKind.Keyword);
+                      ci.documentation = snipData['description']+`\n\nEviews help: [${kw}](${docUri(info)})`;
+                      ci.detail = snipData['usage'] //eviewsGroups[concept][kw]['usage'].split('\n').join(' | ');
+                      ci.range = range;  
+                      ci.insertText = new vscode.SnippetString(snipData['body'].join('\n'));
+                      items.push(ci);
+                    }
+                  } else {
+                    const usage = eviewsGroups[concept][kw]['usage'];
+                    for(let use of usageSnippets(usage, kw)) {
+                      const ci = new vscode.CompletionItem(kw, vscode.CompletionItemKind.Keyword);
+                      ci.documentation = eviewsGroups[concept][kw]['description']+`\n\nEviews help: [${kw}](${docUri(info)})`;
+                      ci.detail = use[0] //eviewsGroups[concept][kw]['usage'].split('\n').join(' | ');
+                      ci.range = range;
+                      ci.insertText = use[1];
+                      items.push(ci);    
+                    }  
+                  }
+                }
+              }  
             }
             for(let concept of ['Element Information','Functions','Operators','General Information','Basic Workfile Functions','Dated Workfile Information','Panel Workfile Functions']) {
               for(const kw in eviewsGroups[concept]) {
                 if(kw[0]=='[') continue;
+                const info = eviewsGroups[concept][kw]
                 const ci = new vscode.CompletionItem(kw, vscode.CompletionItemKind.Function);
-                ci.documentation = eviewsGroups[concept][kw]['description'];
+                ci.documentation = eviewsGroups[concept][kw]['description']+`\n\nEviews help: [${kw}](${docUri(info)})`;
                 ci.detail = eviewsGroups[concept][kw]['usage'].split('\n').join(' | ');
                 ci.range = range;
                 items.push(ci);
@@ -162,6 +364,7 @@ export function activate(context: vscode.ExtensionContext) {
             const symbols = file.getAllSymbols(parserCollection, position.line, true);
             for(const symbol of symbols) {
               if(symbol.object instanceof ev.ParsedSub) {
+                if(linePrefix.trim().toLowerCase()!=='call') continue;
                 const name = symbol.object.name.toLowerCase();
                 const type = 'subroutine';
                 const scope = symbol.scope;
@@ -174,6 +377,7 @@ export function activate(context: vscode.ExtensionContext) {
                   ci.documentation = `${capType}: ${info.description}`+fileInfo;
                   ci.detail = `${capType} ${name} (${scope})`;
                   ci.range = range;
+                  ci.preselect = true;
                   items.push(ci);
                 }
               }
@@ -181,11 +385,11 @@ export function activate(context: vscode.ExtensionContext) {
   
               }
               else { //Variable
+                if(linePrefix.trim().toLowerCase()==='call') continue;
                 const name = symbol.object.name.toLowerCase();
                 const type = symbol.object.type.toLowerCase();
                 const scope = symbol.scope;
                 const capType = type[0].toUpperCase()+type.slice(1);
-                const concept = 'Commands';
                 if(`[${capType}]` in eviewsGroups[capType]) {
                   const info = eviewsGroups[capType][`[${capType}]`];
                   const ci = new vscode.CompletionItem(name, vscode.CompletionItemKind.Function);
@@ -216,27 +420,43 @@ export function activate(context: vscode.ExtensionContext) {
         'eviews-prg',
         {
           provideSignatureHelp(document: vscode.TextDocument, position: vscode.Position, token: vscode.CancellationToken, context: vscode.SignatureHelpContext) {
-            if(context.activeSignatureHelp!==undefined) {
-              if(context.triggerCharacter==',') {
-                context.activeSignatureHelp.activeParameter++;
-                return context.activeSignatureHelp;
-              }
-            }
-            const range = document.getWordRangeAtPosition(position, /((?:\{[%!][a-zA-Z_]\w*\}|[a-zA-Z_]\w*)(?:\{[%!][a-zA-Z_]\w*\}|\w*)*\.)?([@]?[A-Z_]\w*)([( ].*)/i);
-            const funcText = document.getText(range);
-            const funcMatch = funcText.match(/((?:\{[%!][a-zA-Z_]\w*\}|[a-zA-Z_]\w*)(?:\{[%!][a-zA-Z_]\w*\}|\w*)*\.)?([@]?[A-Z_]\w*)([( ].*)/i);
+            const range = document.getWordRangeAtPosition(position, /(call)?\s*((?:\{[%!][a-zA-Z_]\w*\}|[a-zA-Z_]\w*)(?:\{[%!][a-zA-Z_]\w*\}|\w*)*\.)?([@]?[A-Z_]\w*)([(](?:[^(^)]*|\(.*\))*)/i);
+            if(range===undefined) return;
+            const fullFuncText = document.getText(range);
+            const funcText = document.getText(new vscode.Range(range.start, position));
+            const funcMatch = funcText.match(/(call)?\s*((?:\{[%!][a-zA-Z_]\w*\}|[a-zA-Z_]\w*)(?:\{[%!][a-zA-Z_]\w*\}|\w*)*\.)?([@]?[A-Z_]\w*)([(](?:[^(^)]*|\(.*\))*)$/i);
             if (funcMatch) {
               const file = parserCollection.files[document.uri.toString()];
               let callData:KeywordInfo|undefined = undefined;
               let callName;
               let obj:string;
               let capType:string;
-              let argPart: string;
               let concept: string;
-              if(funcMatch[1]!==undefined) { //method call
-                obj = funcMatch[1].slice(0, funcMatch[1].length-1);
-                callName = funcMatch[2].toLowerCase();
-                argPart = funcMatch[3];
+              let argPart: string = funcMatch[4];
+              if(context.activeSignatureHelp!==undefined) {
+                if(context.triggerCharacter===',') {
+                  context.activeSignatureHelp.activeParameter = getParamLoc(argPart);
+                  return context.activeSignatureHelp;
+                }
+              }
+              const signatureHelp = new vscode.SignatureHelp();
+              signatureHelp.activeParameter = getParamLoc(argPart);
+              if(funcMatch[1]!==undefined) { //subroutine call
+                callName = funcMatch[3].toLowerCase();
+                const symbol = file.getSymbol(parserCollection, callName, position.line, true);
+                if(symbol!==undefined && symbol.object instanceof ev.ParsedSub) {
+                  const sigData = subSigData(symbol.object);  
+                  const sig = new vscode.SignatureInformation(sigData.call, 'Subroutine');
+                  for(const arg of sigData.args) {
+                    sig.parameters.push(new vscode.ParameterInformation(arg.label, arg.description));
+                  }
+                  signatureHelp.signatures.push(sig);
+                  return signatureHelp;
+                }
+              }
+              if(funcMatch[2]!==undefined) { //method call
+                obj = funcMatch[2].slice(0, funcMatch[1].length-1);
+                callName = funcMatch[3].toLowerCase();
                 concept = `${obj} method`;
                 const symbol = file.getSymbol(parserCollection, obj, position.line, true);
                 if(symbol) {
@@ -252,58 +472,67 @@ export function activate(context: vscode.ExtensionContext) {
                 }
               }
               else { //function call or a command
-                const callName = funcMatch[2].toLowerCase();
-                const argPart = funcMatch[3];
+                const callName = funcMatch[3].toLowerCase();
+                const argPart = funcMatch[4];
                 for(concept of ['Programming','Commands','Element Information','Functions','Operators','General Information','Basic Workfile Functions','Dated Workfile Information','Panel Workfile Functions']) {
                   if(callName in eviewsGroups[concept]) {
                     callData = eviewsGroups[concept][callName];
                     break;
                   }   
-                }                               
+                }
               }
-              const signatureHelp = new vscode.SignatureHelp();
               if(callData===undefined) return;
               const sigString = callData['usage'].trim()
               if(sigString.toUpperCase().startsWith('SYNTAX:')) {
                 const sigParts = sigString.split('\n');
                 if(sigParts.length>0) {
-                  const sig = new vscode.SignatureInformation(sigParts[0].slice(7).trim())
-                  for(let arg of sigParts.slice(1)) {
-                    sig.parameters.push(new vscode.ParameterInformation(arg.trim()))
+                  const sig = new vscode.SignatureInformation(sigParts[0].slice(7).trim(), callData.description)
+                  const argMatch = sigString.match(/\((.*)\)/i)
+                  if(argMatch) {
+                    let i=1;
+                    for(let arg of argMatch[1].split(',')) {
+                      arg = arg.replace('[','').replace(']','').trim();
+                      const pi = i<sigParts.length && sigParts[i].match(RegExp(arg,'i'))?
+                        new vscode.ParameterInformation(arg.trim(),sigParts[i].trim()):
+                        new vscode.ParameterInformation(arg.trim());
+                      sig.parameters.push(pi);
+                      ++i;
+                    }
                   }
                   signatureHelp.signatures.push(sig);
                 }  
               }
               else if(sigString.split('\n').length==1) {
-                const sig = new vscode.SignatureInformation(sigString)
+                const sig = new vscode.SignatureInformation(sigString, callData.description)
                 const argMatch = sigString.match(/\(.*\)/i)
                 if(argMatch) {
                   for(let arg of argMatch[0].split(',')) {
+                    arg = arg.replace('[','').replace(']','').trim();
                     sig.parameters.push(new vscode.ParameterInformation(arg.trim()))
                   }  
-                  signatureHelp.signatures.push(sig);
                 }
-              } //TODO: Other types of usage completions
-              else {
+                signatureHelp.signatures.push(sig);
+              } 
+              else { //TODO: Other types of usage completions won't always fit this pattern of one variant per line
                 console.log('Unparseable args', sigString)
                 const sigs = sigString.split('\n');
                 for(const s of sigs) {
-                  const sig = new vscode.SignatureInformation(s.trim());
+                  const sig = new vscode.SignatureInformation(s.trim(), callData.description);
                   const argMatch = sigString.match(/\(.*\)/i)
                   if(argMatch) {
                     for(let arg of argMatch[0].split(',')) {
-                      sig.parameters.push(new vscode.ParameterInformation(arg.trim()))
+                      arg = arg.replace('[','').replace(']','').trim();
+                      sig.parameters.push(new vscode.ParameterInformation(arg.trim()));
                     }
                   }  
                   signatureHelp.signatures.push(sig);  
                 }
               }
-              signatureHelp.activeParameter = 0;
               return signatureHelp;
             }
           }
         },
-        '(', ',', ' ', '\t'  // trigger characters
+        '(', ',', ')', // trigger characters
       )
     );
     const hprov = vscode.languages.registerHoverProvider(

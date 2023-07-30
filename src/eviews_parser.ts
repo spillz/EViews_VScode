@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
+import { time } from 'console';
 
 export var eviewsTypes = [
     'ALPHA', 'MODEL', 'SVECTOR', 'COEF', 'POOL', 'SYM', 'EQUATION', 'ROWVECTOR', 'SYSTEM', 
@@ -289,13 +290,18 @@ export class ParsedFile {
                 let args:VariableArray = new VariableArray();
                 [sub, argPart] = lsu.slice(10).split('(', 2);
                 sub = sub.trim();
-                const sargs = argPart.split(')',1)[0].split(',');
-                for(let sarg of sargs) {
-                    sarg = sarg.trim();
-                    let argDef = sarg.match(/(\w+)\s([%!][A-Z_]\w*)/)
-                    if(argDef) {
-                        args.push(v(argDef[1], argDef[2])); //argDef[1] contains the type. Check it is a valid one
-                    } //track error if no match
+                if(argPart!==undefined) {
+                    const sargs = argPart.split(')',1)[0].split(','); //TODO: Error if no closing brace
+                    for(let sarg of sargs) {
+                        sarg = sarg.trim();
+                        let argDef = sarg.match(/(\w+)\s([%!]?[A-Z_]\w*)/i);
+                        if(argDef) {
+                            args.push(v(argDef[1], argDef[2])); //argDef[1] contains the type. Check it is a valid one
+                        } //track error if no match
+                    }
+                    if(args.length===0) {
+                        this.problems.push({line:i, message:'ERROR: Do not use of parens for zero argument subroutine.'})
+                    }   
                 }
                 let j = i + 1;
                 while (j < code.length) {

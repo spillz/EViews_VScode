@@ -5,13 +5,12 @@
   "icon": "icon.png",
   "publisher": "dlmprod",
   "license": "MIT License",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "engines": {
     "vscode": "^1.80.0"
   },
   "categories": [
-    "Programming Languages",
-    "Snippets"
+    "Programming Languages"
   ],
   "main": "./out/extension.js",
   "activationEvents": [],
@@ -38,12 +37,6 @@
         "language": "eviews-prg",
         "scopeName": "source.eviews",
         "path": "./syntaxes/eviews-prg.tmLanguage.json"
-      }
-    ],
-    "snippets": [
-      {
-        "language": "eviews-prg",
-        "path": "./snippets.json"
       }
     ],
     "menus": {

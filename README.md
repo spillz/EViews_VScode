@@ -27,3 +27,7 @@ Intellisense and hover for definitions. Integrates with EViews webhelp but provi
 ### 0.2.1
 
 Basic signature help for commands, functions and methods  
+
+### 0.2.2
+
+Improvements in command hinting via dynamic snippets and signature help for functions and subroutines. Lots of bugfixes across the board.

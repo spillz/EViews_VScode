@@ -21,3 +21,10 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 ## [0.2.1] - 7/29/2023
 
  - Basic signature help
+
+### [0.2.2] - 7/30/2023
+
+ - Much improved signature help
+ - Use dynamic snippets instead of sig help for commands
+ - More appropriate completion hints based on context
+ - Lots of bug fixes
