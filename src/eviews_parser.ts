@@ -234,7 +234,6 @@ export class ParsedFile {
     }
 
     async parse(collection: ParsedRoutinesCollection) {
-        console.log('STARTED PARSE ON', this.file.toString());
         //this.code = fs.readFileSync(this.file, 'utf8').split('\n');
         try {
             this.code = await vscode.workspace.openTextDocument(this.file);
@@ -245,7 +244,7 @@ export class ParsedFile {
         }
         const code = this.code.getText().split('\n');
         let i = -1;
-        while (i+1 < code.length) {
+        while(i+1 < code.length) {
             i++;
             let line = code[i];
             let lsu = line.trim().toUpperCase();
@@ -401,12 +400,17 @@ export class ParsedRoutinesCollection {
         while(true) {
             const file = await this.pop();
             if(file==='#END') break;
-            await this.parse(file);    
+            try {
+                await this.parse(file);    
+            } catch(error) {
+                console.log('Error during parse on file', file)
+                console.log(error);
+            }
         }
     }
 
     async parse(file: string) {
-        console.log('COLLECTION PARSE INITIATED ON',file);
+        console.log('Eviews extension: parse initiated on',file);
         let pf = new ParsedFile(file);
         await pf.parse(this);
     }
@@ -469,10 +473,3 @@ export function checkVarCollisions(pr: ParsedRoutinesCollection): void {
     }
 }
 
-// os.chdir(path)
-
-// pr = ParsedRoutines()
-// pr.parse(base_file)
-// print(pr)
-
-// check_var_collisions(pr)
