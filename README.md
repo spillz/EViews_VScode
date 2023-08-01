@@ -10,6 +10,23 @@ Provides basic syntax highlighting, intellisense and hover for the EViews script
 
 None required to use the extension although you will obviously need a copy of EViews to be able to run your programs.
 
+## Building the extension from source
+
+To build and test the extension, you need to install VS Code and node.js on your test machine of choice.
+
+In VS Code (or your command line tools of choice) clone the extension github repository (https://github.com/spillz/eviews_vscode) and in a terminal run the following command:
+
+```
+cd <location of cloned repository>
+npm install -g vsce
+npm install
+vsce package
+```
+
+That should produce a `eviews-language-extensions-<version>.vsix` extension.
+
+You can then either install the extension into your VS code instance by `Ctrl+Shift+P => "Extensions: Install from VSIX..."` or debug the extension in a separate VS Code instance by seleecting the `Start Debugging` option from the Debugging sidebar panel.
+
 ## Release Notes
 
 ### 0.1.0
