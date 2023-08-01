@@ -5,7 +5,7 @@
   "icon": "icon.png",
   "publisher": "dlmprod",
   "license": "MIT License",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "engines": {
     "vscode": "^1.80.0"
   },
@@ -42,11 +42,29 @@
     "commands": [
       {
           "command": "eviews.runEViews",
-          "title": "Launch EViews"
-      }
+          "title": "Run in EViews",
+          "when": "editorLangId == eviews-prg",
+          "icon": "$(play)"
+        }
       ],
     "menus": {
-      "editor/title/run": []
+        "editor/title": [
+            {
+                "command": "eviews.runEViews",
+                "group": "navigation",
+                "when": "editorLangId == eviews-prg"
+            }
+        ]
+    },
+    "configuration": {
+      "title": "Eviews Language Extension Configuration",
+      "properties": {
+          "eviews-language-extension.eviews-path": {
+              "type": "string",
+              "default": "",
+              "description": "Full path to the EViews executable."
+          }
+      }
     }
   },
   "scripts": {

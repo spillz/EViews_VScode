@@ -240,13 +240,67 @@ export function activate(context: vscode.ExtensionContext) {
     }
   }
 
-  let disposable = vscode.commands.registerCommand('eviews.runEViews', () => {
-    console.log("Running eviews.RunEViews command");
-    const eviewsExec = new vscode.ShellExecution("C:\\Program Files (x86)\\EViews 12\\EViews12_x64.exe");
+  // let disposable = vscode.tasks.registerTaskProvider('eviews-prg', {
+  //   provideTasks(token:vscode.CancellationToken) {
+  //     const editor = vscode.window.activeTextEditor;
+  //     if(!editor || editor.document.languageId!=='eviews-prg') return;
+  //     const eviewsExec = new vscode.ProcessExecution(`chromium https://help.eviews.com/ ${editor.document.uri}`);
+  //     const _task = new vscode.Task(
+  //       { type: 'eviewLaunchGroup' }, 
+  //       vscode.TaskScope.Global,
+  //       'eviews.launch.activeEditor', // Task name
+  //       'eviewsLaunchGroup', // Task source
+  //       eviewsExec // The ShellExecution object
+  //     );
+  //     return [_task];
+  //   },
+  //   resolveTask(task: vscode.Task, token:CancellationToken): vscode.Task {
+  //     return task;
+  //   }
+  // });
+
+  // context.subscriptions.push(disposable);
+
+  const disposable = vscode.commands.registerCommand('eviews.runEViews', () => {
+    let eviewsPrg = vscode.workspace.getConfiguration('eviews-language-extension').get('eviews-prg');
+    if(!eviewsPrg) {
+      if(process.platform!=='win32') {
+        vscode.window.showErrorMessage('EViews launch only supported on Windows');
+        return;
+      }
+      const files = vscode.window.showOpenDialog({
+        canSelectMany: false,
+        openLabel: 'Select the EViews executable',
+        defaultUri: vscode.Uri.file('C:\\Program Files (x86)\\'),
+        filters: {
+          'Eviews exectuable': ['exe']
+        }
+      }).then((uris) => {
+        if(uris && uris.length==1) {
+          const uri = uris[0];
+          if(path.extname(uri.fsPath)==='.exe') {
+            vscode.workspace.getConfiguration('eviews-language-extension').update('eviews-prg', uri.fsPath);
+            vscode.commands.executeCommand("eviews.runEViews");
+          }
+        }
+      });
+      return;
+    }
+    const editor = vscode.window.activeTextEditor;
+    if(!editor || editor.document.languageId!=='eviews-prg') return;
+    const eviewsExec = new vscode.ShellExecution(`chromium ${editor.document.uri.fsPath}`);
+    const _task = new vscode.Task(
+      { type: 'eviewLaunchGroup' }, 
+      vscode.TaskScope.Global,
+      'eviews.launch.activeEditor', // Task name
+      'eviewsLaunchGroup', // Task source
+      eviewsExec // The ShellExecution object
+    );
+  vscode.tasks.executeTask(_task);
   });
 
   context.subscriptions.push(disposable);
-    
+
   const openDocs = vscode.workspace.textDocuments.filter((doc)=>doc.languageId==='eviews-prg');
   for(let doc of openDocs) {
     parserCollection.push(doc.uri.toString());

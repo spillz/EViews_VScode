@@ -28,3 +28,7 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
  - Use dynamic snippets instead of sig help for commands
  - More appropriate completion hints based on context
  - Lots of bug fixes
+
+ ### [0.2.3] - 8/1/2023
+
+    Run in EViews command
