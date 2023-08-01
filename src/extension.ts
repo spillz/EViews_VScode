@@ -4,14 +4,6 @@ import * as path from 'path';
 import * as fs from 'fs';
 import * as ev from './eviews_parser';
 
-export const Exec_In_Terminal_Icon = 'eviews.execInTerminal-icon';
-
-
-// export interface ICommandNameArgumentTypeMapping extends ICommandNameWithoutArgumentTypeMapping {
-//     ['vscode.openWith']: [Uri, string];
-//     [Exec_In_Terminal_Icon]: [Uri, string];
-// }
-
 type Snip = {
   [id:string]: {prefix:string, body:string[], usage:string, description:string}
 }
@@ -238,31 +230,39 @@ export function activate(context: vscode.ExtensionContext) {
       }
       eviewsGroups[grp][kwd] = kwinfo;
     }
-  }
+  };
 
-  // let disposable = vscode.tasks.registerTaskProvider('eviews-prg', {
-  //   provideTasks(token:vscode.CancellationToken) {
-  //     const editor = vscode.window.activeTextEditor;
-  //     if(!editor || editor.document.languageId!=='eviews-prg') return;
-  //     const eviewsExec = new vscode.ProcessExecution(`chromium https://help.eviews.com/ ${editor.document.uri}`);
-  //     const _task = new vscode.Task(
-  //       { type: 'eviewLaunchGroup' }, 
-  //       vscode.TaskScope.Global,
-  //       'eviews.launch.activeEditor', // Task name
-  //       'eviewsLaunchGroup', // Task source
-  //       eviewsExec // The ShellExecution object
-  //     );
-  //     return [_task];
-  //   },
-  //   resolveTask(task: vscode.Task, token:CancellationToken): vscode.Task {
-  //     return task;
-  //   }
-  // });
+  let disposable;
+  
+  disposable = vscode.commands.registerCommand('eviews.setEViewsPath', () => {
+    if(process.platform!=='win32') {
+      vscode.window.showErrorMessage('EViews launch only supported on Windows');
+      return;
+    }
+    let defaultPath:string = vscode.workspace.getConfiguration('eviews-language-extension').get('eviews-path')!;
+    if(!defaultPath) {
+      defaultPath = 'C:\\Program Files (x86)\\';
+    }
+    const files = vscode.window.showOpenDialog({
+      canSelectMany: false,
+      openLabel: 'Select the EViews executable',
+      defaultUri: vscode.Uri.file(defaultPath),
+      filters: {
+        'Eviews exectuable': ['exe']
+      }
+    }).then((uris) => {
+      if(uris && uris.length==1) {
+        const uri = uris[0];
+        if(path.extname(uri.fsPath)==='.exe') {
+          vscode.workspace.getConfiguration('eviews-language-extension').update('eviews-path', uri.fsPath);
+        }
+      }
+    });
+  });
 
-  // context.subscriptions.push(disposable);
 
-  const disposable = vscode.commands.registerCommand('eviews.runEViews', () => {
-    let eviewsPrg = vscode.workspace.getConfiguration('eviews-language-extension').get('eviews-prg');
+  disposable = vscode.commands.registerCommand('eviews.runEViews', () => {
+    let eviewsPrg:string = vscode.workspace.getConfiguration('eviews-language-extension').get('eviews-path')!;
     if(!eviewsPrg) {
       if(process.platform!=='win32') {
         vscode.window.showErrorMessage('EViews launch only supported on Windows');
@@ -279,7 +279,7 @@ export function activate(context: vscode.ExtensionContext) {
         if(uris && uris.length==1) {
           const uri = uris[0];
           if(path.extname(uri.fsPath)==='.exe') {
-            vscode.workspace.getConfiguration('eviews-language-extension').update('eviews-prg', uri.fsPath);
+            vscode.workspace.getConfiguration('eviews-language-extension').update('eviews-path', uri.fsPath);
             vscode.commands.executeCommand("eviews.runEViews");
           }
         }
@@ -288,13 +288,13 @@ export function activate(context: vscode.ExtensionContext) {
     }
     const editor = vscode.window.activeTextEditor;
     if(!editor || editor.document.languageId!=='eviews-prg') return;
-    const eviewsExec = new vscode.ShellExecution(`chromium ${editor.document.uri.fsPath}`);
+    const eviewsExec = new vscode.ProcessExecution(eviewsPrg, [editor.document.uri.fsPath]);
     const _task = new vscode.Task(
       { type: 'eviewLaunchGroup' }, 
       vscode.TaskScope.Global,
       'eviews.launch.activeEditor', // Task name
       'eviewsLaunchGroup', // Task source
-      eviewsExec // The ShellExecution object
+      eviewsExec // The ProcessExecution object
     );
   vscode.tasks.executeTask(_task);
   });

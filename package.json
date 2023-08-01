@@ -41,20 +41,25 @@
     ],
     "commands": [
       {
-          "command": "eviews.runEViews",
-          "title": "Run in EViews",
-          "when": "editorLangId == eviews-prg",
-          "icon": "$(play)"
-        }
-      ],
+        "command": "eviews.runEViews",
+        "title": "Run in EViews",
+        "when": "editorLangId == eviews-prg",
+        "icon": "$(play)"
+      },
+      {
+        "command": "eviews.setEViewsPath",
+        "title": "Set path for the EViews executable...",
+        "icon": "$(gear)"
+      }
+    ],
     "menus": {
-        "editor/title": [
-            {
-                "command": "eviews.runEViews",
-                "group": "navigation",
-                "when": "editorLangId == eviews-prg"
-            }
-        ]
+      "editor/title": [
+        {
+          "command": "eviews.runEViews",
+          "group": "navigation",
+          "when": "editorLangId == eviews-prg"
+        }
+      ]
     },
     "configuration": {
       "title": "Eviews Language Extension Configuration",
