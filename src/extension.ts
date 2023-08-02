@@ -743,7 +743,8 @@ export function activate(context: vscode.ExtensionContext) {
               if(type in eviewsGroups[concept]) {
                 const info = eviewsGroups[concept][type];
                 const desc = info.description;
-                const fileInfo = file.file.toString()===symbol.file.toString()? '':`\n\nDefined in [${path.basename(symbol.file.fsPath).toLowerCase()}:${symbol.object.start+1}](${symbol.file.toString()}#L${symbol.object.start+1})`;
+                const fileInfo = file.file.toString()===symbol.file.toString()? `\n\nDefined on [line ${symbol.object.start+1}](${symbol.file.toString()}#L${symbol.object.start+1})`:
+                  `\n\nDefined in [${path.basename(symbol.file.fsPath).toLowerCase()}:${symbol.object.start+1}](${symbol.file.toString()}#L${symbol.object.start+1})`;
                 const sigData = subSigData(symbol.object);  
                 const contents = new vscode.MarkdownString(`${capType} ${sigData.call} (${scope})${fileInfo}\n\n${capType}: ${desc}\n\nEviews help: [${capType}](${docUri(info)})`);  
                 contents.isTrusted = true;
