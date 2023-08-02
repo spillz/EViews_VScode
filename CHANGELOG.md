@@ -31,4 +31,8 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
  ### [0.2.3] - 8/1/2023
 
-    Run in EViews command
+ - Run in EViews command
+
+ ### [0.2.4] - 8/1/2023
+
+ - Improved and more reliable call signature parser for signature help

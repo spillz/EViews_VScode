@@ -52,3 +52,7 @@ Improvements in command hinting via dynamic snippets and signature help for func
 ### 0.2.3
 
 Added Run in EViews command
+
+### 0.2.4
+
+Improved and more reliable call signature parser for signature help
