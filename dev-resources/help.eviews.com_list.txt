@@ -2246,6 +2246,8 @@ xypair: graphmaster-xypair.html
 @stdev: mathapp_cpr.html#ww200789
 @stdevp: mathapp_cpr.html#ww200794
 @stdevs: mathapp_cpr.html#ww200799
+@sfill: stringref-@sfill.html#ww864055
+@str: stringref-@str.html#ww864080
 @stripcommas: stringref-@stripcommas.html
 @stripparens: stringref-@stripparens.html
 @stripquotes: stringref-@stripquotes.html
