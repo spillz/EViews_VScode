@@ -235,7 +235,7 @@ type KeywordInfo = {
 }
 
 function docUri(kwi:KeywordInfo) {
-  const end = kwi.anchor===''?kwi.uri+'.html':kwi.uri+'.html#'+kwi.anchor;
+  const end = kwi.anchor===''?kwi.uri+'.html':kwi.uri+'.html%23'+kwi.anchor;
   return 'https://help.eviews.com/#page/content/'+end;
 }
 
