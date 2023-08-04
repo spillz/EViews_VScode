@@ -25,11 +25,11 @@
     ],
     "indentationRules": {
         "increaseIndentPattern": {
-            "pattern": "^\\s*\\b(SUBROUTINE|FOR|IF|WHILE|ELSE)\\b.*?\\s",
+            "pattern": "^\\s*\\b(SUBROUTINE|FOR|IF|WHILE|ELSE)\\b.*",
             "flags": "i"
         },
         "decreaseIndentPattern": {
-            "pattern": "^\\s*\\b(ENDSUB|NEXT|ENDIF|WEND)\\b.*?\\s*",
+            "pattern": "^\\s*\\b(ENDSUB|NEXT|ELSE|ENDIF|WEND)\\b.*",
             "flags": "i"
         }
     },
