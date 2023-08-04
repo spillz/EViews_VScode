@@ -56,3 +56,7 @@ Added Run in EViews command
 ### 0.2.4
 
 Improved and more reliable call signature parser for signature help
+
+### 0.2.5
+
+Updates for missing EViews builtins, more hover links to files and definitions, subroutine doc strings on hover, fix broken EViews help links.

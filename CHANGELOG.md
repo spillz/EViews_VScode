@@ -36,3 +36,24 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
  ### [0.2.4] - 8/1/2023
 
  - Improved and more reliable call signature parser for signature help
+
+ ### [0.2.5] - 8/4/2023
+
+ - Updates for missing EViews builtins, corrected broken EViews help hyperlinks
+ - Hover links to local subs
+ - Hyperlinks with anchors need to be escaped to work correctly
+ - Parse doc strings for subroutines
+ - Improved handling of mixed case definitios and filenames
+ - Provide link to includes for click to open in editor
+ - Provide link and line # of variable definitions
+
+ ### [0.2.6] -- FUTURE PLANS
+
+ - Copy cmd creates definitions [?]
+ - Completions on object element operations (e.g., comletions/sig help on myVec in "myVec(2) = 1" and "!c = myVec(2)") [?]
+ 
+ ### [0.3.0] - FUTURE PLANS
+
+ - Errors/Problems [?]
+ - Outline in Explorer View [?]
+ - In-comment declarations to aid intellisense [?]
