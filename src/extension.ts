@@ -694,7 +694,7 @@ export function activate(context: vscode.ExtensionContext) {
         document: vscode.TextDocument, position: vscode.Position, token: vscode.CancellationToken): vscode.ProviderResult<vscode.Hover> {
         let range = document.getWordRangeAtPosition(position, /[!%@]?(?:\{[%!][a-zA-Z_]\w*\}|[a-zA-Z_]\w*)(?:\{[%!][a-zA-Z_]\w*\}|\w*)*/i);
         if(range!==undefined) {
-          const word = document.getText(range);//.toLowerCase(); 
+          const word = document.getText(range).toLowerCase(); 
           const lineStart = new vscode.Position(range.start.line,0);
           const dottedMatch = document.getText(new vscode.Range(lineStart, range.start))
                               .match(/[!%@]?(?:\{[%!][a-zA-Z_]\w*\}|[a-zA-Z_]\w*)(?:\{[%!][a-zA-Z_]\w*\}|\w*)*\.$/i);
@@ -727,11 +727,21 @@ export function activate(context: vscode.ExtensionContext) {
             }
             return new vscode.Hover(new vscode.MarkdownString(`Unknown method of unknown object ${obj}`));
           }
+          let extraDocs = '';
+          if(word==='include') { //Provide a link to included modules
+            const file = parserCollection.files[document.uri.toString()];
+            for(const inc of file.includes) {
+              if(position.line===inc.line) {
+                extraDocs = ` ([${path.basename(inc.uri)}](${inc.uri}))`;
+                break;
+              }
+            }
+          }
           for(let concept of ['Programming','Commands','Element Information','Functions','Operators','General Information','Basic Workfile Functions','Dated Workfile Information','Panel Workfile Functions']) {
             if(word in eviewsGroups[concept]) {
               const info = eviewsGroups[concept][word];
               const desc = info.longDescription? info.description+'\n\n'+info.longDescription : info.description;
-              const contents = new vscode.MarkdownString(`${concept}: ${word}\n\nUsage: ${info.usage}\n\n${desc}\n\nEviews help: [${word}](${docUri(info)})`);  
+              const contents = new vscode.MarkdownString(`${concept}: ${word}${extraDocs}\n\nUsage: ${info.usage}\n\n${desc}\n\nEviews help: [${word}](${docUri(info)})`);  
               contents.isTrusted = true;
               return new vscode.Hover(contents);
             }

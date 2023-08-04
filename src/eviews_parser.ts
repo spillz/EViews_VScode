@@ -34,14 +34,29 @@ function v(type:string, name:string):Variable {
 
 export class VariableArray extends Array<Variable> {
     has(name:string):boolean {
-        const uname = name.toUpperCase()
+        const uname = name.toUpperCase();
         return this.find((member)=>member.lookupName===uname)!==undefined;
     }
     get(name:string):Variable|undefined {
-        const uname = name.toUpperCase()
+        const uname = name.toUpperCase();
         return this.find((member)=>member.lookupName===uname);
     }
 }
+
+export type Include = {
+    uri: string,
+    line: number,
+}
+
+export class IncludeArray extends Array<Include> {
+    has(uri:string):boolean {
+        return this.find((member)=>member.uri===uri)!==undefined;
+    }
+    get(uri:string):Include|undefined {
+        return this.find((member)=>member.uri===uri);
+    }
+}
+
 
 type DocString = {body:string, args:{[id:string]:string}};
 
@@ -165,7 +180,7 @@ export class ParsedFile {
     processed_code: string[] | null;
     subroutines: ParsedSub[];
     vars: VariableArray;
-    includes: string[];
+    includes: IncludeArray;
     calls: string[];
     exists: boolean;
     problems: CodeProblem[];
@@ -176,7 +191,7 @@ export class ParsedFile {
         this.processed_code = null;
         this.subroutines = [];
         this.vars = new VariableArray();
-        this.includes = [];
+        this.includes = new IncludeArray();
         this.calls = [];
         this.exists = true;
         this.problems = [];
@@ -196,7 +211,7 @@ export class ParsedFile {
         }
         if(followIncludes) {
             for(let i of this.includes) {
-                const pf = collection.files[i];
+                const pf = collection.files[i.uri];
                 const isymbols = pf.getAllSymbols(collection, null, followIncludes);
                 symbols = [...symbols, ...isymbols];
             }
@@ -225,7 +240,7 @@ export class ParsedFile {
         }
         if(followIncludes) {
             for(let i of this.includes) {
-                const pf = collection.files[i];
+                const pf = collection.files[i.uri];
                 const symbol = pf.getSymbol(collection, name, null, followIncludes);
                 if(symbol!==undefined) {
                     return symbol;
@@ -285,8 +300,8 @@ export class ParsedFile {
                 }
                 // const resReal = fs.realpathSync(res);
                 // const uri = vscode.Uri.file(resReal).toString();
-                if (!this.includes.includes(uri)) {
-                    this.includes.push(uri);
+                if (!this.includes.has(uri)) {
+                    this.includes.push({uri:uri,line:i});
                 }
                 continue
             }
@@ -376,8 +391,8 @@ export class ParsedFile {
         }
         collection.files[this.file.toString()] = this;
         for (let include of this.includes) {
-            if (!(include in collection.files)) {
-                collection.push(include);
+            if (!(include.uri in collection.files)) {
+                collection.push(include.uri);
             }
         }
     }
