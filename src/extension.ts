@@ -380,12 +380,9 @@ export function activate(context: vscode.ExtensionContext) {
   }));
   const cprov = vscode.languages.registerCompletionItemProvider(
     'eviews-prg',
-    new (class implements vscode.CompletionItemProvider {
-      provideCompletionItems(
-        document: TextDocument, 
-        position: Position, 
-        token: CancellationToken, 
-        context: vscode.CompletionContext): vscode.ProviderResult<vscode.CompletionItem[] | vscode.CompletionList<vscode.CompletionItem>> {
+    {
+      provideCompletionItems(document: TextDocument, position: Position, token: CancellationToken, context: vscode.CompletionContext): 
+                    vscode.ProviderResult<vscode.CompletionItem[] | vscode.CompletionList<vscode.CompletionItem>> {
         const items:vscode.CompletionItem[] = [];
         let range = document.getWordRangeAtPosition(position, /([!%@]?(?:\{[%!][a-zA-Z_]\w*\}|[a-zA-Z_]\w*)(?:\{[%!][a-zA-Z_]\w*\}|\w*)*\.?|[!%@])/i);
         const file = parserCollection.files[document.uri.toString()];
@@ -558,146 +555,141 @@ export function activate(context: vscode.ExtensionContext) {
           }
         }
         return items;
-      }
+      },
       resolveCompletionItem(item: vscode.CompletionItem, token: CancellationToken): vscode.ProviderResult<vscode.CompletionItem> {
         return item;
       }
-    })(), 
+    }, 
     '@',
     '.',
     '%',
     '!',
   );
-    context.subscriptions.push(
-      vscode.languages.registerSignatureHelpProvider(
-        'eviews-prg',
-        {
-          provideSignatureHelp(document: vscode.TextDocument, position: vscode.Position, token: vscode.CancellationToken, context: vscode.SignatureHelpContext) {
-            const lineStart = new vscode.Position(position.line,0);
-            const line = document.getText(new vscode.Range(lineStart, position))
-            const lineSigData = getLineSigData(line);
-            if(lineSigData===undefined) return;
-            const file = parserCollection.files[document.uri.toString()];
-            if(lineSigData.argPos===undefined || lineSigData.funcPart===undefined) return;
-            if(context.activeSignatureHelp!==undefined) {
-              if(context.triggerCharacter===',') {
-                context.activeSignatureHelp.activeParameter = lineSigData.argPos;
-                return context.activeSignatureHelp;
-              }
+  const sprov = vscode.languages.registerSignatureHelpProvider(
+    'eviews-prg',
+    {
+      provideSignatureHelp(document: vscode.TextDocument, position: vscode.Position, token: vscode.CancellationToken, context: vscode.SignatureHelpContext) {
+        const lineStart = new vscode.Position(position.line,0);
+        const line = document.getText(new vscode.Range(lineStart, position))
+        const lineSigData = getLineSigData(line);
+        if(lineSigData===undefined) return;
+        const file = parserCollection.files[document.uri.toString()];
+        if(lineSigData.argPos===undefined || lineSigData.funcPart===undefined) return;
+        if(context.activeSignatureHelp!==undefined) {
+          if(context.triggerCharacter===',') {
+            context.activeSignatureHelp.activeParameter = lineSigData.argPos;
+            return context.activeSignatureHelp;
+          }
+        }
+        let callName:string = lineSigData.funcPart.toLowerCase();
+        let callData:KeywordInfo|undefined = undefined;
+        let capType:string;
+        let concept: string;
+        const signatureHelp = new vscode.SignatureHelp();
+        signatureHelp.activeParameter = lineSigData.argPos;
+        if(lineSigData.sub) { //subroutine call
+          const symbol = file.getSymbol(parserCollection, callName, position.line, true);
+          if(symbol!==undefined && symbol.object instanceof ev.ParsedSub) {
+            const sigData = subSigData(symbol.object);  
+            const sig = new vscode.SignatureInformation(sigData.call, 'Subroutine');
+            for(const arg of sigData.args) {
+              sig.parameters.push(new vscode.ParameterInformation(arg.label, arg.description));
             }
-            let callName:string = lineSigData.funcPart.toLowerCase();
-            let callData:KeywordInfo|undefined = undefined;
-            let capType:string;
-            let concept: string;
-            const signatureHelp = new vscode.SignatureHelp();
-            signatureHelp.activeParameter = lineSigData.argPos;
-            if(lineSigData.sub) { //subroutine call
-              const symbol = file.getSymbol(parserCollection, callName, position.line, true);
-              if(symbol!==undefined && symbol.object instanceof ev.ParsedSub) {
-                const sigData = subSigData(symbol.object);  
-                const sig = new vscode.SignatureInformation(sigData.call, 'Subroutine');
-                for(const arg of sigData.args) {
-                  sig.parameters.push(new vscode.ParameterInformation(arg.label, arg.description));
-                }
-                signatureHelp.signatures.push(sig);
-                return signatureHelp;
-              }
-            }
-            if(lineSigData.obj) { //object property/method call
-              const obj = lineSigData.obj;
-              concept = `${obj} property`;
-              const symbol = file.getSymbol(parserCollection, obj, position.line, true);
-              if(symbol) {
-                if(!(symbol.object instanceof ev.ParsedSub) && !(symbol.object instanceof String) && !(typeof(symbol.object)==='string')) {
-                  const type = symbol.object.type.toLowerCase();
-                  capType = type[0].toUpperCase()+type.slice(1);
-                  if(capType in eviewsGroups) {
-                    if(callName in eviewsGroups[capType]) {
-                      callData = eviewsGroups[capType][callName];
-                    }
-                  }  
-                }
-              }
-            }
-            else { //function call or a command
-              for(concept of ['Programming','Commands','Element Information','Functions','Operators','General Information','Basic Workfile Functions','Dated Workfile Information','Panel Workfile Functions']) {
-                if(callName in eviewsGroups[concept]) {
-                  callData = eviewsGroups[concept][callName];
-                  break;
-                }   
-              }
-            }
-            if(callData===undefined) return;
-            const sigString = callData['usage'].trim()
-            if(sigString.toUpperCase().startsWith('SYNTAX:')) {
-              const sigParts = sigString.split('\n');
-              if(sigParts.length>0) {
-                const sig = new vscode.SignatureInformation(sigParts[0].slice(7).trim(), callData.description)
-                const argMatch = sigString.match(/\((.*)\)/i)
-                if(argMatch) {
-                  let i=1;
-                  for(let arg of argMatch[1].split(',')) {
-                    arg = arg.replace('[','').replace(']','').trim();
-                    const pi = i<sigParts.length && sigParts[i].match(RegExp(arg,'i'))?
-                      new vscode.ParameterInformation(arg.trim(),sigParts[i].trim()):
-                      new vscode.ParameterInformation(arg.trim());
-                    sig.parameters.push(pi);
-                    ++i;
-                  }
-                }
-                signatureHelp.signatures.push(sig);
-              }  
-            }
-            else if(sigString.split('\n').length==1) {
-              const sig = new vscode.SignatureInformation(sigString, callData.description)
-              const argMatch = sigString.match(/\(.*\)/i)
-              if(argMatch) {
-                for(let arg of argMatch[0].split(',')) {
-                  arg = arg.replace('[','').replace(']','').trim();
-                  sig.parameters.push(new vscode.ParameterInformation(arg.trim()))
-                }  
-              }
-              signatureHelp.signatures.push(sig);
-            } 
-            else { //TODO: Other types of usage completions won't always fit this pattern of one variant per line
-              const sigs = sigString.split('\n');
-              for(const s of sigs) {
-                const sig = new vscode.SignatureInformation(s.trim(), callData.description);
-                const argMatch = sigString.match(/\(.*\)/i)
-                if(argMatch) {
-                  for(let arg of argMatch[0].split(',')) {
-                    arg = arg.replace('[','').replace(']','').trim();
-                    sig.parameters.push(new vscode.ParameterInformation(arg.trim()));
-                  }
-                }  
-                signatureHelp.signatures.push(sig);  
-              }
-            }
+            signatureHelp.signatures.push(sig);
             return signatureHelp;
           }
-        },
-        '(', ',', ')', // trigger characters
-      )
-    );
-    const hprov = vscode.languages.registerHoverProvider(
+        }
+        if(lineSigData.obj) { //object property/method call
+          const obj = lineSigData.obj;
+          concept = `${obj} property`;
+          const symbol = file.getSymbol(parserCollection, obj, position.line, true);
+          if(symbol) {
+            if(!(symbol.object instanceof ev.ParsedSub) && !(symbol.object instanceof String) && !(typeof(symbol.object)==='string')) {
+              const type = symbol.object.type.toLowerCase();
+              capType = type[0].toUpperCase()+type.slice(1);
+              if(capType in eviewsGroups) {
+                if(callName in eviewsGroups[capType]) {
+                  callData = eviewsGroups[capType][callName];
+                }
+              }  
+            }
+          }
+        }
+        else { //function call or a command
+          for(concept of ['Programming','Commands','Element Information','Functions','Operators','General Information','Basic Workfile Functions','Dated Workfile Information','Panel Workfile Functions']) {
+            if(callName in eviewsGroups[concept]) {
+              callData = eviewsGroups[concept][callName];
+              break;
+            }   
+          }
+        }
+        if(callData===undefined) return;
+        const sigString = callData['usage'].trim()
+        if(sigString.toUpperCase().startsWith('SYNTAX:')) {
+          const sigParts = sigString.split('\n');
+          if(sigParts.length>0) {
+            const sig = new vscode.SignatureInformation(sigParts[0].slice(7).trim(), callData.description)
+            const argMatch = sigString.match(/\((.*)\)/i)
+            if(argMatch) {
+              let i=1;
+              for(let arg of argMatch[1].split(',')) {
+                arg = arg.replace('[','').replace(']','').trim();
+                const pi = i<sigParts.length && sigParts[i].match(RegExp(arg,'i'))?
+                  new vscode.ParameterInformation(arg.trim(),sigParts[i].trim()):
+                  new vscode.ParameterInformation(arg.trim());
+                sig.parameters.push(pi);
+                ++i;
+              }
+            }
+            signatureHelp.signatures.push(sig);
+          }  
+        }
+        else if(sigString.split('\n').length==1) {
+          const sig = new vscode.SignatureInformation(sigString, callData.description)
+          const argMatch = sigString.match(/\(.*\)/i)
+          if(argMatch) {
+            for(let arg of argMatch[0].split(',')) {
+              arg = arg.replace('[','').replace(']','').trim();
+              sig.parameters.push(new vscode.ParameterInformation(arg.trim()))
+            }  
+          }
+          signatureHelp.signatures.push(sig);
+        } 
+        else { //TODO: Other types of usage completions won't always fit this pattern of one variant per line
+          const sigs = sigString.split('\n');
+          for(const s of sigs) {
+            const sig = new vscode.SignatureInformation(s.trim(), callData.description);
+            const argMatch = sigString.match(/\(.*\)/i)
+            if(argMatch) {
+              for(let arg of argMatch[0].split(',')) {
+                arg = arg.replace('[','').replace(']','').trim();
+                sig.parameters.push(new vscode.ParameterInformation(arg.trim()));
+              }
+            }  
+            signatureHelp.signatures.push(sig);  
+          }
+        }
+        return signatureHelp;
+      }
+    },
+    '(', ',', ')', // trigger characters
+  )
+  const hprov = vscode.languages.registerHoverProvider(
     'eviews-prg',
-    new (class implements vscode.HoverProvider {
+    {
       provideHover(
-        _document: vscode.TextDocument,
-        _position: vscode.Position,
-        _token: vscode.CancellationToken
-      ): vscode.ProviderResult<vscode.Hover> {
-        let range = _document.getWordRangeAtPosition(_position, /[!%@]?(?:\{[%!][a-zA-Z_]\w*\}|[a-zA-Z_]\w*)(?:\{[%!][a-zA-Z_]\w*\}|\w*)*/i);
+        document: vscode.TextDocument, position: vscode.Position, token: vscode.CancellationToken): vscode.ProviderResult<vscode.Hover> {
+        let range = document.getWordRangeAtPosition(position, /[!%@]?(?:\{[%!][a-zA-Z_]\w*\}|[a-zA-Z_]\w*)(?:\{[%!][a-zA-Z_]\w*\}|\w*)*/i);
         if(range!==undefined) {
-          const word = _document.getText(range).toLowerCase(); 
+          const word = document.getText(range).toLowerCase(); 
           const lineStart = new vscode.Position(range.start.line,0);
-          const dottedMatch = _document.getText(new vscode.Range(lineStart, range.start))
+          const dottedMatch = document.getText(new vscode.Range(lineStart, range.start))
                               .match(/[!%@]?(?:\{[%!][a-zA-Z_]\w*\}|[a-zA-Z_]\w*)(?:\{[%!][a-zA-Z_]\w*\}|\w*)*\.$/i);
           if(word.length>0 && dottedMatch) { //Trigger for method info hover is two adjoining words separated by a . -- todo: don't hover if the word to the left starts with @
             let obj = dottedMatch[0]; //Extract the parent object name
             obj = obj.slice(0,obj.length-1).toLowerCase();
-            const file = parserCollection.files[_document.uri.toString()];
-            const symbol = file.getSymbol(parserCollection, obj, _position.line, true);
+            const file = parserCollection.files[document.uri.toString()];
+            const symbol = file.getSymbol(parserCollection, obj, position.line, true);
             if(symbol) {
               if(symbol.object instanceof ev.ParsedSub) {
                 return;
@@ -731,8 +723,8 @@ export function activate(context: vscode.ExtensionContext) {
               return new vscode.Hover(contents);
             }
           }
-          const file = parserCollection.files[_document.uri.toString()];
-          const symbol = file.getSymbol(parserCollection, word, _position.line, true);
+          const file = parserCollection.files[document.uri.toString()];
+          const symbol = file.getSymbol(parserCollection, word, position.line, true);
           if(symbol) {
             if(symbol.object instanceof ev.ParsedSub) {
               const name = symbol.object.name;
@@ -784,9 +776,9 @@ export function activate(context: vscode.ExtensionContext) {
         // }
 
       }
-    })()
+    }
   );
-  context.subscriptions.push(cprov, hprov);
+  context.subscriptions.push(cprov, hprov, sprov);
 }
 
   // This method is called when your extension is deactivated
