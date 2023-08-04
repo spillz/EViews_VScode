@@ -694,7 +694,8 @@ export function activate(context: vscode.ExtensionContext) {
         document: vscode.TextDocument, position: vscode.Position, token: vscode.CancellationToken): vscode.ProviderResult<vscode.Hover> {
         let range = document.getWordRangeAtPosition(position, /[!%@]?(?:\{[%!][a-zA-Z_]\w*\}|[a-zA-Z_]\w*)(?:\{[%!][a-zA-Z_]\w*\}|\w*)*/i);
         if(range!==undefined) {
-          const word = document.getText(range).toLowerCase(); 
+          const wordAsTyped = document.getText(range); 
+          const word = wordAsTyped.toLowerCase();
           const lineStart = new vscode.Position(range.start.line,0);
           const dottedMatch = document.getText(new vscode.Range(lineStart, range.start))
                               .match(/[!%@]?(?:\{[%!][a-zA-Z_]\w*\}|[a-zA-Z_]\w*)(?:\{[%!][a-zA-Z_]\w*\}|\w*)*\.$/i);
@@ -779,13 +780,18 @@ export function activate(context: vscode.ExtensionContext) {
               if(`[${capType}]` in eviewsGroups[capType]) {
                 const info = eviewsGroups[capType][`[${capType}]`];
                 const desc = info.description;
-                const contents = new vscode.MarkdownString(`${capType} ${word} (${scope})\n\n${desc}\n\nEviews help: [${capType}](${docUri(info)})`);  
+                const fileInfo = file.file.toString()===symbol.file.toString()? `\n\nFirst defined on [line ${symbol.object.line+1}](${symbol.file.toString()}#L${symbol.object.line+1})`:
+                  `\n\nFirst defined in [${path.basename(symbol.file.fsPath)}:${symbol.object.line+1}](${symbol.file.toString()}#L${symbol.object.line+1})`;
+                const contents = new vscode.MarkdownString(`${capType} ${symbol.object.name} (${scope})${fileInfo}\n\n${desc}\n\nEviews help: [${capType}](${docUri(info)})`);  
                 contents.isTrusted = true;
                 return new vscode.Hover(contents);
               }
             }
           }
-        } 
+          if(word.length>0) {
+            return new vscode.Hover(`Unkown name ${wordAsTyped}`);
+          }
+      } 
         // else {
         // // To enable command URIs in Markdown content, you must set the `isTrusted` flag.
         // // When creating trusted Markdown string, make sure to properly sanitize all the

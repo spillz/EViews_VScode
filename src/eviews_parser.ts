@@ -13,6 +13,7 @@ export type Variable = {
     type: string,
     name: string,
     lookupName: string,
+    line: number,
 }
 
 export type CodeProblem = {
@@ -28,8 +29,8 @@ export type Symbol = {
 }
 
 
-function v(type:string, name:string):Variable {
-    return {type:type, name:name, lookupName:name.toUpperCase()};
+function v(type:string, name:string, line:number):Variable {
+    return {type:type, name:name, lookupName:name.toUpperCase(), line:line};
 }
 
 export class VariableArray extends Array<Variable> {
@@ -117,7 +118,7 @@ export class ParsedSub {
                 const vname = match[1];
                 if (!this.vars.has(vname) && !this.args.has(vname)) {
                     const vtype = vname[0]=='%'? 'STRING': 'SCALAR';
-                    this.vars.push(v(vtype, vname));
+                    this.vars.push(v(vtype, vname, i));
                 }
                 continue
             }
@@ -129,7 +130,7 @@ export class ParsedSub {
                             match[0][match[0].length-1]==='='?'SCALAR':
                             'STRING';
                     if(!this.vars.has(match[1]) && !this.args.has(match[1])) {
-                        this.vars.push(v(type, match[1]));
+                        this.vars.push(v(type, match[1], i));
                     }
                 }
                 continue
@@ -139,7 +140,7 @@ export class ParsedSub {
                     const match = lsu.slice(objectName.length).match(/^(?:\(.*\))?\s*((\{[%!][a-zA-Z_]\w*\}|[a-zA-Z_]\w*)+)/) //TODO: this will pick up objects defined by commands like vector(n) vecname{!i}_t
                     if(match) {
                         if (!this.vars.has(match[1]) && !this.args.has(match[1])) {
-                            this.vars.push(v(objectName, match[1]));
+                            this.vars.push(v(objectName, match[1], i));
                         }
                     }
                     continue
@@ -312,12 +313,12 @@ export class ParsedFile {
                 }
                 continue
             }
-            let match = line.match(/([%!][A-Z_]\w*)[ \t]*=.*/i);
+            let match = line.match(/^([%!][A-Z_]\w*)[ \t]*=.*/i);
             if (match) {
                 const varName = match[1];
                 const varType = varName[0]=='%'? 'STRING':'SCALAR';
                 if (!this.vars.has(varName)) {
-                    this.vars.push(v(varType, varName));
+                    this.vars.push(v(varType, varName, i));
                 }
                 continue
             }
@@ -332,18 +333,18 @@ export class ParsedFile {
                         sarg = sarg.trim();
                         let argDef = sarg.match(/(\w+)\s([%!]?[A-Z_]\w*)/i);
                         if(argDef) {
-                            args.push(v(argDef[1], argDef[2])); //argDef[1] contains the type. Check it is a valid one
+                            args.push(v(argDef[1], argDef[2], i)); //argDef[1] contains the type. Check it is a valid one
                         } //track error if no match
                     }
                     if(args.length===0) {
-                        this.problems.push({line:i, message:'ERROR: Do not use of parens for zero argument subroutine.'})
+                        this.problems.push({line:i, message:'ERROR: Do not use parens for zero argument subroutine.'})
                     }   
                 }
                 let j = i + 1;
                 while (j < code.length) {
                     let lline = code[j];
                     if (lline.trim().toUpperCase().startsWith('SUBROUTINE')) {
-                        this.problems.push({line:j, message:'ERROR: Illegal nested sub', var:v('SUB',sub)});
+                        this.problems.push({line:j, message:'ERROR: Illegal nested sub', var:v('SUB', sub, j)});
                         let ps = new ParsedSub(this, sub, i, j, args);
                         ps.parse(code);
                         this.subroutines.push(ps);
@@ -358,7 +359,7 @@ export class ParsedFile {
                     j++;
                 }
                 if (j === code.length) {
-                    this.problems.push({line:j, message:'ERROR: Missing endsub in file', var:v('SUB',sub)});
+                    this.problems.push({line:j, message:'ERROR: Missing endsub in file', var:v('SUB',sub, j)});
                     let ps = new ParsedSub(this, sub, i, j, args);
                     ps.parse(code);
                     this.subroutines.push(ps);
@@ -374,7 +375,7 @@ export class ParsedFile {
                             match[0][match[0].length-1]==='='?'SCALAR':
                             'STRING';
                     if(!this.vars.has(match[1])) {
-                        this.vars.push(v(type, match[1]));
+                        this.vars.push(v(type, match[1], i));
                     }
                 }
                 continue
@@ -383,7 +384,7 @@ export class ParsedFile {
                 if(lsu.startsWith(objectType)) {
                     const match = line.slice(objectType.length).match(/^(?:\(.*\))?\s*(([a-zA-Z_]\w*|\{[%!][a-zA-Z_]\w*\})+)/); //TODO: this will pick up commands like vector(n) vecname{!i}_t
                     if(match && !this.vars.has(match[1])) {
-                        this.vars.push(v(objectType, match[1]));
+                        this.vars.push(v(objectType, match[1], i));
                     }
                     continue
                 }
