@@ -180,14 +180,27 @@ function getParamLoc(argPart:string): number {
 }
 
 function subSigData(sub:ev.ParsedSub):SigData {
-  const argPart = sub.args.map((a)=>`${a.type.toLowerCase()} ${a.name.toLowerCase()}`).join(', ');
-  const call = sub.args.length>0? `call ${sub.name.toLowerCase()}(${argPart})`:`call ${sub.name.toLowerCase()}`;
-  const args = sub.args.map((a)=>{return {label:a.name.toLowerCase(), description:`${a.type.toLowerCase()} ${a.name.toLowerCase()}`};});
+  const argPart = sub.args.map((a)=>`${a.type.toLowerCase()} ${a.name}`).join(', ');
+  const call = sub.args.length>0? `call ${sub.name}(${argPart})`:`call ${sub.name}`;
+  const args = sub.args.map((a)=>{return {label:a.name, description:`${a.name} (${a.type.toLowerCase()}): `+((a.lookupName in sub.docString.args)?sub.docString.args[a.lookupName]:'_no description_')};});
   return {
     call: call,
     args: args,
   };
 }
+
+function subDocString(sub:ev.ParsedSub):string {
+  let md = sub.docString.body!==''? sub.docString.body:'_No description_'
+  let args = ''
+  for(const a of sub.args) {
+    args += `\n\n * ${a.name} (${a.type.toLowerCase()}): `+((a.lookupName in sub.docString.args)?sub.docString.args[a.lookupName]:'_no description_');
+  }
+  if(args.length>0) {
+    md += '\n\nArguments:'+args
+  }
+  return md
+}
+
 
 function usageSnippets(usage:string, kw:string):Array<[string, vscode.SnippetString]> {
   const snippets:Array<[string, vscode.SnippetString]> = [];
@@ -391,7 +404,7 @@ export function activate(context: vscode.ExtensionContext) {
         let dottedMatch:RegExpMatchArray|null;
         let subCallMatch:RegExpMatchArray|null;
         if(range!==undefined) {
-          word = document.getText(range).toLowerCase();
+          word = document.getText(range);//.toLowerCase();
           dottedMatch = document.getText(new vscode.Range(lineStart, range.start))
                               .match(/[!%@]?(?:\{[%!][a-zA-Z_]\w*\}|[a-zA-Z_]\w*)(?:\{[%!][a-zA-Z_]\w*\}|\w*)*\.$/i);
           subCallMatch = dottedMatch===null? 
@@ -415,7 +428,7 @@ export function activate(context: vscode.ExtensionContext) {
           //Trigger for method completion is either a . or beginning of a word after a .
           if(word.endsWith('.')) range = document.getWordRangeAtPosition(position); //Reposition the insertion range to be after the "."
           let obj = word.endsWith('.')? word : dottedMatch![0]; //Extract the parent object name
-          obj = obj.slice(0,obj.length-1).toLowerCase();
+          obj = obj.slice(0,obj.length-1);//.toLowerCase();
           const symbol = file.getSymbol(parserCollection, obj, position.line, true);
           if(symbol) {
             if(symbol.object instanceof ev.ParsedSub) {
@@ -515,7 +528,7 @@ export function activate(context: vscode.ExtensionContext) {
             //show user-defined subroutines after a call statement
             for(const symbol of symbols) {
               if(symbol.object instanceof ev.ParsedSub) {
-                const name = symbol.object.name.toLowerCase();
+                const name = symbol.object.name;//.toLowerCase();
                 const type = 'subroutine';
                 const scope = symbol.scope;
                 const capType = type[0].toUpperCase()+type.slice(1);
@@ -523,7 +536,7 @@ export function activate(context: vscode.ExtensionContext) {
                 if(type in eviewsGroups[concept]) {
                   const info = eviewsGroups[concept][type];
                   const ci = new vscode.CompletionItem(name, vscode.CompletionItemKind.Function);
-                  const fileInfo = file.file.toString()===symbol.file.toString()? '':`\n\nDefined in [${path.basename(symbol.file.fsPath).toLowerCase()}:${symbol.object.start+1}](${symbol.file.toString()}#L${symbol.object.start+1})`;
+                  const fileInfo = file.file.toString()===symbol.file.toString()? '':`\n\nDefined in [${path.basename(symbol.file.fsPath)}:${symbol.object.start+1}](${symbol.file.toString()}#L${symbol.object.start+1})`;
                   ci.documentation = new vscode.MarkdownString(`${capType}: ${info.description}`+fileInfo);
                   ci.documentation.isTrusted = true;
                   ci.detail = `${capType} ${name} (${scope})`;
@@ -537,14 +550,14 @@ export function activate(context: vscode.ExtensionContext) {
             //otherwise show user-defined objects and variables
             for(const symbol of symbols) {
               if(symbol.object instanceof String || typeof(symbol.object)==='string' || symbol.object instanceof ev.ParsedSub) continue;
-              const name = symbol.object.name.toLowerCase();
+              const name = symbol.object.name;
               const type = symbol.object.type.toLowerCase();
               const scope = symbol.scope;
               const capType = type[0].toUpperCase()+type.slice(1);
               if(`[${capType}]` in eviewsGroups[capType]) {
                 const info = eviewsGroups[capType][`[${capType}]`];
                 const ci = new vscode.CompletionItem(name, vscode.CompletionItemKind.Function);
-                const fileInfo = file.file.toString()===symbol.file.toString()? '':`\n\nDefined in [${path.basename(symbol.file.fsPath).toLowerCase()}](${symbol.file.toString()})`;
+                const fileInfo = file.file.toString()===symbol.file.toString()? '':`\n\nDefined in [${path.basename(symbol.file.fsPath)}](${symbol.file.toString()})`;
                 ci.documentation = new vscode.MarkdownString(`${info.description}`+fileInfo);
                 ci.documentation.isTrusted = true;
                 ci.detail = `${capType} ${name} (${scope})`;
@@ -581,7 +594,7 @@ export function activate(context: vscode.ExtensionContext) {
             return context.activeSignatureHelp;
           }
         }
-        let callName:string = lineSigData.funcPart.toLowerCase();
+        let callName:string = lineSigData.funcPart;;
         let callData:KeywordInfo|undefined = undefined;
         let capType:string;
         let concept: string;
@@ -591,7 +604,7 @@ export function activate(context: vscode.ExtensionContext) {
           const symbol = file.getSymbol(parserCollection, callName, position.line, true);
           if(symbol!==undefined && symbol.object instanceof ev.ParsedSub) {
             const sigData = subSigData(symbol.object);  
-            const sig = new vscode.SignatureInformation(sigData.call, 'Subroutine');
+            const sig = new vscode.SignatureInformation(sigData.call, `Subroutine ${symbol.object.name}`);
             for(const arg of sigData.args) {
               sig.parameters.push(new vscode.ParameterInformation(arg.label, arg.description));
             }
@@ -681,13 +694,13 @@ export function activate(context: vscode.ExtensionContext) {
         document: vscode.TextDocument, position: vscode.Position, token: vscode.CancellationToken): vscode.ProviderResult<vscode.Hover> {
         let range = document.getWordRangeAtPosition(position, /[!%@]?(?:\{[%!][a-zA-Z_]\w*\}|[a-zA-Z_]\w*)(?:\{[%!][a-zA-Z_]\w*\}|\w*)*/i);
         if(range!==undefined) {
-          const word = document.getText(range).toLowerCase(); 
+          const word = document.getText(range);//.toLowerCase(); 
           const lineStart = new vscode.Position(range.start.line,0);
           const dottedMatch = document.getText(new vscode.Range(lineStart, range.start))
                               .match(/[!%@]?(?:\{[%!][a-zA-Z_]\w*\}|[a-zA-Z_]\w*)(?:\{[%!][a-zA-Z_]\w*\}|\w*)*\.$/i);
           if(word.length>0 && dottedMatch) { //Trigger for method info hover is two adjoining words separated by a . -- todo: don't hover if the word to the left starts with @
             let obj = dottedMatch[0]; //Extract the parent object name
-            obj = obj.slice(0,obj.length-1).toLowerCase();
+            obj = obj.slice(0,obj.length-1);//.toLowerCase();
             const file = parserCollection.files[document.uri.toString()];
             const symbol = file.getSymbol(parserCollection, obj, position.line, true);
             if(symbol) {
@@ -736,9 +749,10 @@ export function activate(context: vscode.ExtensionContext) {
                 const info = eviewsGroups[concept][type];
                 const desc = info.description;
                 const fileInfo = file.file.toString()===symbol.file.toString()? `\n\nDefined on [line ${symbol.object.start+1}](${symbol.file.toString()}#L${symbol.object.start+1})`:
-                  `\n\nDefined in [${path.basename(symbol.file.fsPath).toLowerCase()}:${symbol.object.start+1}](${symbol.file.toString()}#L${symbol.object.start+1})`;
-                const sigData = subSigData(symbol.object);  
-                const contents = new vscode.MarkdownString(`${capType} ${sigData.call} (${scope})${fileInfo}\n\n${capType}: ${desc}\n\nEviews help: [${capType}](${docUri(info)})`);  
+                  `\n\nDefined in [${path.basename(symbol.file.fsPath)}:${symbol.object.start+1}](${symbol.file.toString()}#L${symbol.object.start+1})`;
+                const sigData = subSigData(symbol.object);
+                const docString = subDocString(symbol.object);
+                const contents = new vscode.MarkdownString(`${capType} ${sigData.call} (${scope})${fileInfo}\n\n${docString}\n\n---\n\n${capType}: ${desc}\n\nEviews help: [${capType}](${docUri(info)})`);  
                 contents.isTrusted = true;
                 return new vscode.Hover(contents);
               }

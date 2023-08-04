@@ -12,6 +12,7 @@ export var eviewsTypes = [
 export type Variable = {
     type: string,
     name: string,
+    lookupName: string,
 }
 
 export type CodeProblem = {
@@ -28,46 +29,69 @@ export type Symbol = {
 
 
 function v(type:string, name:string):Variable {
-    return {type:type, name:name};
+    return {type:type, name:name, lookupName:name.toUpperCase()};
 }
 
 export class VariableArray extends Array<Variable> {
     has(name:string):boolean {
-        return this.find((member)=>member.name===name)!==undefined;
+        const uname = name.toUpperCase()
+        return this.find((member)=>member.lookupName===uname)!==undefined;
     }
     get(name:string):Variable|undefined {
-        return this.find((member)=>member.name===name);
+        const uname = name.toUpperCase()
+        return this.find((member)=>member.lookupName===uname);
     }
 }
+
+type DocString = {body:string, args:{[id:string]:string}};
 
 export class ParsedSub {
     // Container representing an EViews subroutines parsed for definitions and belonging to a file
     file: ParsedFile;
     name: string;
+    lookupName: string;
     start: number;
     end: number;
     processed_code: string|null;
     vars:VariableArray = new VariableArray();
     calls:Array<string> = [];
     args:VariableArray;
+    docString:DocString;
 
     constructor(file:ParsedFile, name:string, start:number ,end:number, args:VariableArray) {
         this.file = file;
         this.name = name;
+        this.lookupName = name.toUpperCase();
         this.start = start;
         this.end = end;
         this.processed_code = null;
         this.args = args;
+        this.docString = {body:'',args:{}};
     }
 
     parse(code_lines:Array<string>) {
         let i=this.start;
+        let docStringScanning = true;
         while(i+1<this.end) {
             i++;
-            const line = code_lines[i];
-            const lsu = line.trim().toUpperCase();
+            const line = code_lines[i].trim();
+            const lsu = line.toUpperCase();
+            if(docStringScanning) {
+                if(lsu.startsWith("'")) {
+                    const docLine = line.slice(1).trim();
+                    const argMatch = docLine.match(/\s*([!%][A-Z_]\w*)[\s-:=]+(.*)/i);
+                    if(argMatch && argMatch[2].length>0) {
+                        this.docString.args[argMatch[1].toUpperCase()] = argMatch[2];
+                    } else {
+                        this.docString.body += '\n' + docLine;
+                    }
+                } else {
+                    docStringScanning = false;
+                    this.docString.body = this.docString.body.trim();
+                }
+            } 
             if (lsu.startsWith('CALL')) {
-                const call = lsu.slice(4).split("(")[0].trim(); //replace(' ','').replace('\t','')
+                const call = lsu.slice(4).split("(")[0].trim();
                 if(!this.calls.includes(call)) {
                     this.calls.push(call);
                 }
@@ -78,7 +102,7 @@ export class ParsedSub {
                 const vname = match[1];
                 if (!this.vars.has(vname) && !this.args.has(vname)) {
                     const vtype = vname[0]=='%'? 'STRING': 'SCALAR';
-                    this.vars.push(v(vtype, vname))
+                    this.vars.push(v(vtype, vname));
                 }
                 continue
             }
@@ -100,7 +124,7 @@ export class ParsedSub {
                     const match = lsu.slice(objectName.length).match(/^(?:\(.*\))?\s*((\{[%!][a-zA-Z_]\w*\}|[a-zA-Z_]\w*)+)/) //TODO: this will pick up objects defined by commands like vector(n) vecname{!i}_t
                     if(match) {
                         if (!this.vars.has(match[1]) && !this.args.has(match[1])) {
-                            this.vars.push(v(objectName, match[1]))
+                            this.vars.push(v(objectName, match[1]));
                         }
                     }
                     continue
@@ -127,7 +151,7 @@ export class ParsedSub {
         if(this.vars.length>0) {
             rep+='    variables defined\n'
             for(const v of this.vars.sort()) {
-                rep+=`    - {v}\n`
+                rep+=`    - {v}\n`;
             }
         }
         rep += '\n'
@@ -168,7 +192,7 @@ export class ParsedFile {
         for (const v of this.vars) symbols.push({object:v, file:this.file, scope:'global'});
         for(let s of this.subroutines) {
             for(const v of s.vars) symbols.push({object:v, file:this.file, scope:'subroutine-defined global'});
-            symbols.push({object:s, file:this.file, scope:'global'})
+            symbols.push({object:s, file:this.file, scope:'global'});
         }
         if(followIncludes) {
             for(let i of this.includes) {
@@ -181,7 +205,6 @@ export class ParsedFile {
     }
 
     getSymbol(collection: ParsedRoutinesCollection, name:string, line:number|null = null, followIncludes:boolean=false): Symbol|undefined {
-        name = name.toUpperCase();
         for(let s of this.subroutines) {
             if(line!=null && line>=s.start && line<s.end) {
                 if(s.args.has(name)) {
@@ -196,8 +219,8 @@ export class ParsedFile {
             if(s.vars.has(name)) {
                 return {object:s.vars.get(name)!, file:this.file, scope:'subroutine-defined global'};
             }
-            if(name == s.name) {
-                return {object:s, file:this.file, scope:'global'}
+            if(name.toUpperCase() == s.name.toUpperCase()) {
+                return {object:s, file:this.file, scope:'global'};
             }
         }
         if(followIncludes) {
@@ -246,14 +269,13 @@ export class ParsedFile {
         let i = -1;
         while(i+1 < code.length) {
             i++;
-            let line = code[i];
-            let lsu = line.trim().toUpperCase();
+            let line = code[i].trim();
+            let lsu = line.toUpperCase();
             if (lsu.startsWith('INCLUDE')) {
-                console.log('INCLUDE');
-                let include = lsu.slice(7).trim().replace('"','').replace('"',''); //'" \t'
+                let include = line.slice(7).trim().replace('"','').replace('"',''); //'" \t'
                 const res = path.resolve(path.dirname(this.file.fsPath), include);
-                const resDisk = fs.realpathSync.native(res);
-                const resFinal = path.resolve(path.dirname(this.file.fsPath), resDisk.slice(resDisk.length-include.length));
+                // const resDisk = fs.realpathSync.native(res);
+                // const resFinal = path.resolve(path.dirname(this.file.fsPath), resDisk.slice(resDisk.length-include.length));
                 let uri;
                 try {
                     const doc = await vscode.workspace.openTextDocument(res);
@@ -275,7 +297,7 @@ export class ParsedFile {
                 }
                 continue
             }
-            let match = lsu.match(/([%!][A-Z_]\w*)[ \t]*=.*/);
+            let match = line.match(/([%!][A-Z_]\w*)[ \t]*=.*/i);
             if (match) {
                 const varName = match[1];
                 const varType = varName[0]=='%'? 'STRING':'SCALAR';
@@ -287,7 +309,7 @@ export class ParsedFile {
             if (lsu.startsWith('SUBROUTINE')) {
                 let sub:string, argPart:string;
                 let args:VariableArray = new VariableArray();
-                [sub, argPart] = lsu.slice(10).split('(', 2);
+                [sub, argPart] = line.slice(10).split('(', 2);
                 sub = sub.trim();
                 if(argPart!==undefined) {
                     const sargs = argPart.split(')',1)[0].split(','); //TODO: Error if no closing brace
@@ -306,7 +328,7 @@ export class ParsedFile {
                 while (j < code.length) {
                     let lline = code[j];
                     if (lline.trim().toUpperCase().startsWith('SUBROUTINE')) {
-                        this.problems.push({line:j, message:'ERROR: Illegal nested sub', var:{type:'SUB', name:sub}});
+                        this.problems.push({line:j, message:'ERROR: Illegal nested sub', var:v('SUB',sub)});
                         let ps = new ParsedSub(this, sub, i, j, args);
                         ps.parse(code);
                         this.subroutines.push(ps);
@@ -321,7 +343,7 @@ export class ParsedFile {
                     j++;
                 }
                 if (j === code.length) {
-                    this.problems.push({line:j, message:'ERROR: Missing endsub in file', var:{type:'SUB', name:sub}});
+                    this.problems.push({line:j, message:'ERROR: Missing endsub in file', var:v('SUB',sub)});
                     let ps = new ParsedSub(this, sub, i, j, args);
                     ps.parse(code);
                     this.subroutines.push(ps);
@@ -330,7 +352,7 @@ export class ParsedFile {
                 continue
             }
             if(lsu.startsWith('FOR')) {
-                const match = lsu.slice(3).match(/([%!]?[A-Z_]\w*)\s*=?/)
+                const match = line.slice(3).match(/([%!]?[A-Z_]\w*)\s*=?/i);
                 if(match) {
                     const type = match[1][0]==='%'? 'STRING':
                             match[1][0]==='!'? 'SCALAR':
@@ -342,11 +364,11 @@ export class ParsedFile {
                 }
                 continue
             }
-            for(const objectName of eviewsTypes) {
-                if(lsu.startsWith(objectName)) {
-                    const match = lsu.slice(objectName.length).match(/^(?:\(.*\))?\s*(([a-zA-Z_]\w*|\{[%!][a-zA-Z_]\w*\})+)/); //TODO: this will pick up commands like vector(n) vecname{!i}_t
+            for(const objectType of eviewsTypes) {
+                if(lsu.startsWith(objectType)) {
+                    const match = line.slice(objectType.length).match(/^(?:\(.*\))?\s*(([a-zA-Z_]\w*|\{[%!][a-zA-Z_]\w*\})+)/); //TODO: this will pick up commands like vector(n) vecname{!i}_t
                     if(match && !this.vars.has(match[1])) {
-                        this.vars.push(v(objectName, match[1]));
+                        this.vars.push(v(objectType, match[1]));
                     }
                     continue
                 }
