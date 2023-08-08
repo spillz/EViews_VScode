@@ -105,7 +105,7 @@ export class ParsedSub {
                     docStringScanning = false;
                     this.docString.body = this.docString.body.trim();
                 }
-            } 
+            }
             if (lsu.startsWith('CALL')) {
                 const call = lsu.slice(4).split("(")[0].trim();
                 if(!this.calls.includes(call)) {
@@ -113,7 +113,7 @@ export class ParsedSub {
                 }
                 continue
             }
-            const match = lsu.match(/^([%!][A-Z_]\w*)\s*=.*/);
+            const match = line.match(/^([%!][a-zA-Z_]\w*)\s*=.*/);
             if (match) {
                 const vname = match[1];
                 if (!this.vars.has(vname) && !this.args.has(vname)) {
@@ -123,7 +123,7 @@ export class ParsedSub {
                 continue
             }
             if(lsu.startsWith('FOR')) {
-                const match = lsu.slice(3).match(/([%!]?[A-Z_]\w*)\s*=?/)
+                const match = line.slice(3).match(/([%!]?[a-zA-Z_]\w*)\s*=?/)
                 if(match) {
                     const type = match[1][0]==='%'? 'STRING':
                             match[1][0]==='!'? 'SCALAR':
@@ -137,7 +137,7 @@ export class ParsedSub {
             }
             for(const objectName of eviewsTypes) {
                 if(lsu.startsWith(objectName)) {
-                    const match = lsu.slice(objectName.length).match(/^(?:\(.*\))?\s*((\{[%!][a-zA-Z_]\w*\}|[a-zA-Z_]\w*)+)/) //TODO: this will pick up objects defined by commands like vector(n) vecname{!i}_t
+                    const match = line.slice(objectName.length).match(/^(?:\(.*\))?\s*((\{[%!][a-zA-Z_]\w*\}|[a-zA-Z_]\w*)+)/) //TODO: this will pick up objects defined by commands like vector(n) vecname{!i}_t
                     if(match) {
                         if (!this.vars.has(match[1]) && !this.args.has(match[1])) {
                             this.vars.push(v(objectName, match[1], i));
