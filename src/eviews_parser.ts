@@ -90,7 +90,7 @@ export class ParsedSub {
         let docStringScanning = true;
         while(i+1<this.end) {
             i++;
-            const line = code_lines[i].trim();
+            let line = code_lines[i].trim();
             const lsu = line.toUpperCase();
             if(docStringScanning) {
                 if(lsu.startsWith("'")) {
@@ -112,6 +112,24 @@ export class ParsedSub {
                     this.calls.push(call);
                 }
                 continue
+            }
+            if (lsu.startsWith('COPY')) {
+                const parens = line.slice(4).match(/^(\(.*?\))?/)
+                if(!parens) continue
+                line = line.slice(4+parens[0].length);
+                const srcVar = line.match(/^(?:\(.*\))?\s*((\{[%!][a-zA-Z_]\w*\}|[a-zA-Z_]\w*)+)/) //TODO: this will pick up objects defined by commands like vector(n) vecname{!i}_t
+                if(!srcVar) continue;
+                const destVar = line.slice(srcVar[0].length).match(/^(?:\(.*\))?\s*((\{[%!][a-zA-Z_]\w*\}|[a-zA-Z_]\w*)+)/) //TODO: this will pick up objects defined by commands like vector(n) vecname{!i}_t                
+                if(!destVar) continue;
+                const srcName = srcVar[1];
+                let vtype:string;
+                if(this.args.has(srcName)) vtype = this.args.get(srcName)!.type;
+                else if(this.vars.has(srcName)) vtype = this.vars.get(srcName)!.type;
+                else continue;
+                const vname = destVar[1];
+                if(this.vars.has(vname) || this.args.has(vname)) continue;
+                this.vars.push(v(vtype, vname, i))
+                continue;
             }
             const match = line.match(/^([%!][a-zA-Z_]\w*)\s*=.*/);
             if (match) {
@@ -379,6 +397,22 @@ export class ParsedFile {
                     }
                 }
                 continue
+            }
+            if (lsu.startsWith('COPY')) {
+                const parens = line.slice(4).match(/^(\(.*?\))?/)
+                if(!parens) continue
+                line = line.slice(4+parens[0].length);
+                const srcVar = line.match(/^(?:\(.*\))?\s*((\{[%!][a-zA-Z_]\w*\}|[a-zA-Z_]\w*)+)/) //TODO: this will pick up objects defined by commands like vector(n) vecname{!i}_t
+                if(!srcVar) continue;
+                const destVar = line.slice(srcVar[0].length).match(/^(?:\(.*\))?\s*((\{[%!][a-zA-Z_]\w*\}|[a-zA-Z_]\w*)+)/) //TODO: this will pick up objects defined by commands like vector(n) vecname{!i}_t                
+                if(!destVar) continue;
+                const srcName = srcVar[1];
+                if(!this.vars.has(srcName)) continue 
+                const vtype = this.vars.get(srcName)!.type;
+                const vname = destVar[1];
+                if(this.vars.has(vname)) continue;
+                this.vars.push(v(vtype, vname, i))
+                continue;
             }
             for(const objectType of eviewsTypes) {
                 if(lsu.startsWith(objectType)) {
