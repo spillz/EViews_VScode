@@ -60,3 +60,7 @@ Improved and more reliable call signature parser for signature help
 ### 0.2.5
 
 Updates for missing EViews builtins, more hover links to files and definitions, subroutine doc strings on hover, fix broken EViews help links.
+
+### 0.2.6
+
+Bugfixes on case handling of symbols in subroutines. Copy command as variable definitions. No hints on "." operator for program variables.

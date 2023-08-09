@@ -41,19 +41,19 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
  - Updates for missing EViews builtins, corrected broken EViews help hyperlinks
  - Hover links to local subs
- - Hyperlinks with anchors need to be escaped to work correctly
  - Parse doc strings for subroutines
  - Improved handling of mixed case definitios and filenames
  - Provide link to includes for click to open in editor
  - Provide link and line # of variable definitions
 
- ### [0.2.6] -- FUTURE PLANS
+ ### [0.2.6] -- 8/8/2023
 
- - Copy cmd creates definitions [?]
- - Completions on object element operations (e.g., comletions/sig help on myVec in "myVec(2) = 1" and "!c = myVec(2)") [?]
+ - Bug fixes for variable case in subroutines
+ - Copy cmd creates definitions
  
  ### [0.3.0] - FUTURE PLANS
 
  - Errors/Problems [?]
  - Outline in Explorer View [?]
  - In-comment declarations to aid intellisense [?]
+ - Completions on object element operations (e.g., comletions/sig help on myVec in "myVec(2) = 1" and "!c = myVec(2)") [?]
