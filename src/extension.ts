@@ -731,6 +731,55 @@ export function activate(context: vscode.ExtensionContext) {
             }
             return new vscode.Hover(new vscode.MarkdownString(`Unknown method of unknown object ${obj}`));
           }
+          const file = parserCollection.files[document.uri.toString()];
+          const symbol = file.getSymbol(parserCollection, word, position.line, true);
+          if(symbol) {
+            if(symbol.object instanceof ev.ParsedSub) {
+              const line = document.getText(new vscode.Range(lineStart,range.start)).trim().toUpperCase();
+              if(line.startsWith('CALL') || line.startsWith('SUBROUTINE')) {
+                const name = symbol.object.name;
+                const type = 'subroutine';
+                const scope = symbol.scope;
+                const capType = type[0].toUpperCase()+type.slice(1);
+                const concept = 'Programming';
+                if(type in eviewsGroups[concept]) {
+                  const info = eviewsGroups[concept][type];
+                  const desc = info.description;
+                  const fileInfo = file.file.toString()===symbol.file.toString()? `\n\nDefined on [line ${symbol.object.start+1}](${symbol.file.toString()}#L${symbol.object.start+1})`:
+                    `\n\nDefined in [${path.basename(symbol.file.fsPath)}:${symbol.object.start+1}](${symbol.file.toString()}#L${symbol.object.start+1})`;
+                  const sigData = subSigData(symbol.object);
+                  const docString = subDocString(symbol.object);
+                  const contents = new vscode.MarkdownString(`${capType} ${sigData.call} (${scope})${fileInfo}\n\n${docString}\n\n---\n\n${capType}: ${desc}\n\nEviews help: [${capType}](${docUri(info)})`);  
+                  contents.isTrusted = true;
+                  return new vscode.Hover(contents);
+                }  
+              }
+            }
+            else if(symbol.object instanceof String || typeof(symbol.object)==='string') {
+
+            }
+            else { //Variable
+              const line = document.getText(new vscode.Range(lineStart,range.start)).trim().toUpperCase();
+              const lineEnd = document.getText(new vscode.Range(range.end, document.lineAt(range.end.line).range.end)).trim().toUpperCase();
+              //show user defined symbols for program vars, words after the first on the line, dot operations, or assignments (with optional params)
+              if(word[0]==='%'||word[0]==='!'||line.match(/^[!%]?[A-Za-z]/)||lineEnd.match(/^(:?\(.*?\))?(\.|\s*=)/)) { 
+                const name = symbol.object.name;
+                const type = symbol.object.type.toLowerCase();
+                const scope = symbol.scope;
+                const capType = type[0].toUpperCase()+type.slice(1);
+                const concept = 'Commands';
+                if(`[${capType}]` in eviewsGroups[capType]) {
+                  const info = eviewsGroups[capType][`[${capType}]`];
+                  const desc = info.description;
+                  const fileInfo = file.file.toString()===symbol.file.toString()? `\n\nFirst defined on [line ${symbol.object.line+1}](${symbol.file.toString()}#L${symbol.object.line+1})`:
+                    `\n\nFirst defined in [${path.basename(symbol.file.fsPath)}:${symbol.object.line+1}](${symbol.file.toString()}#L${symbol.object.line+1})`;
+                  const contents = new vscode.MarkdownString(`${capType} ${symbol.object.name} (${scope})${fileInfo}\n\n${desc}\n\nEviews help: [${capType}](${docUri(info)})`);  
+                  contents.isTrusted = true;
+                  return new vscode.Hover(contents);
+                }  
+              }
+            }
+          }
           let extraDocs = '';
           if(word==='include') { //Provide a link to included modules
             const file = parserCollection.files[document.uri.toString()];
@@ -748,47 +797,6 @@ export function activate(context: vscode.ExtensionContext) {
               const contents = new vscode.MarkdownString(`${concept}: ${word}${extraDocs}\n\nUsage: ${info.usage}\n\n${desc}\n\nEviews help: [${word}](${docUri(info)})`);  
               contents.isTrusted = true;
               return new vscode.Hover(contents);
-            }
-          }
-          const file = parserCollection.files[document.uri.toString()];
-          const symbol = file.getSymbol(parserCollection, word, position.line, true);
-          if(symbol) {
-            if(symbol.object instanceof ev.ParsedSub) {
-              const name = symbol.object.name;
-              const type = 'subroutine';
-              const scope = symbol.scope;
-              const capType = type[0].toUpperCase()+type.slice(1);
-              const concept = 'Programming';
-              if(type in eviewsGroups[concept]) {
-                const info = eviewsGroups[concept][type];
-                const desc = info.description;
-                const fileInfo = file.file.toString()===symbol.file.toString()? `\n\nDefined on [line ${symbol.object.start+1}](${symbol.file.toString()}#L${symbol.object.start+1})`:
-                  `\n\nDefined in [${path.basename(symbol.file.fsPath)}:${symbol.object.start+1}](${symbol.file.toString()}#L${symbol.object.start+1})`;
-                const sigData = subSigData(symbol.object);
-                const docString = subDocString(symbol.object);
-                const contents = new vscode.MarkdownString(`${capType} ${sigData.call} (${scope})${fileInfo}\n\n${docString}\n\n---\n\n${capType}: ${desc}\n\nEviews help: [${capType}](${docUri(info)})`);  
-                contents.isTrusted = true;
-                return new vscode.Hover(contents);
-              }
-            }
-            else if(symbol.object instanceof String || typeof(symbol.object)==='string') {
-
-            }
-            else { //Variable
-              const name = symbol.object.name;
-              const type = symbol.object.type.toLowerCase();
-              const scope = symbol.scope;
-              const capType = type[0].toUpperCase()+type.slice(1);
-              const concept = 'Commands';
-              if(`[${capType}]` in eviewsGroups[capType]) {
-                const info = eviewsGroups[capType][`[${capType}]`];
-                const desc = info.description;
-                const fileInfo = file.file.toString()===symbol.file.toString()? `\n\nFirst defined on [line ${symbol.object.line+1}](${symbol.file.toString()}#L${symbol.object.line+1})`:
-                  `\n\nFirst defined in [${path.basename(symbol.file.fsPath)}:${symbol.object.line+1}](${symbol.file.toString()}#L${symbol.object.line+1})`;
-                const contents = new vscode.MarkdownString(`${capType} ${symbol.object.name} (${scope})${fileInfo}\n\n${desc}\n\nEviews help: [${capType}](${docUri(info)})`);  
-                contents.isTrusted = true;
-                return new vscode.Hover(contents);
-              }
             }
           }
           if(word.length>0) {
