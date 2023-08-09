@@ -429,6 +429,7 @@ export function activate(context: vscode.ExtensionContext) {
           if(word.endsWith('.')) range = document.getWordRangeAtPosition(position); //Reposition the insertion range to be after the "."
           let obj = word.endsWith('.')? word : dottedMatch![0]; //Extract the parent object name
           obj = obj.slice(0,obj.length-1);//.toLowerCase();
+          if(obj[0]==='!' || obj[0]==='%') return;
           const symbol = file.getSymbol(parserCollection, obj, position.line, true);
           if(symbol) {
             if(symbol.object instanceof ev.ParsedSub) {
@@ -614,6 +615,7 @@ export function activate(context: vscode.ExtensionContext) {
         }
         if(lineSigData.obj) { //object property/method call
           const obj = lineSigData.obj;
+          if(obj[0]==='!' || obj[0]==='%') return;
           concept = `${obj} property`;
           const symbol = file.getSymbol(parserCollection, obj, position.line, true);
           if(symbol) {
@@ -702,6 +704,7 @@ export function activate(context: vscode.ExtensionContext) {
           if(word.length>0 && dottedMatch) { //Trigger for method info hover is two adjoining words separated by a . -- todo: don't hover if the word to the left starts with @
             let obj = dottedMatch[0]; //Extract the parent object name
             obj = obj.slice(0,obj.length-1);//.toLowerCase();
+            if(obj[0]==='!' || obj[0]==='%') return new vscode.Hover(`Invalid "." operation on program variable ${obj}`);
             const file = parserCollection.files[document.uri.toString()];
             const symbol = file.getSymbol(parserCollection, obj, position.line, true);
             if(symbol) {
