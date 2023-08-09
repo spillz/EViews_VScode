@@ -50,6 +50,7 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
  - Bug fixes for variable case in subroutines
  - Copy cmd creates definitions
+ - No "." operator hints on program vars
  
  ### [0.3.0] - FUTURE PLANS
 
