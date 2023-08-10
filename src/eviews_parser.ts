@@ -216,53 +216,77 @@ export class ParsedFile {
         this.problems = [];
     }
 
-    getAllSymbols(collection: ParsedRoutinesCollection, line:number|null = null, followIncludes:boolean=false): Symbol[] {
+    getAllSymbols(collection: ParsedRoutinesCollection, line:number|null = null, followIncludes:boolean=false, followOthers:boolean=false, followedIncludes:Array<ParsedFile>=[], scopePrefix:string=''): Symbol[] {
         let symbols:Symbol[] = [];
         for(let s of this.subroutines) {
             if(line!=null && line>s.start && line<s.end) {
-                for(const a of s.args) symbols.push({object:a, file:this.file, scope:'subroutine argument'});
+                for(const a of s.args) symbols.push({object:a, file:this.file, scope:scopePrefix+'subroutine argument'});
             }
         }
-        for (const v of this.vars) symbols.push({object:v, file:this.file, scope:'global'});
+        for (const v of this.vars) symbols.push({object:v, file:this.file, scope:scopePrefix+'global'});
         for(let s of this.subroutines) {
-            for(const v of s.vars) symbols.push({object:v, file:this.file, scope:'subroutine-defined global'});
-            symbols.push({object:s, file:this.file, scope:'global'});
+            for(const v of s.vars) symbols.push({object:v, file:this.file, scope:scopePrefix+'subroutine-defined global'});
+            symbols.push({object:s, file:this.file, scope:scopePrefix+'global'});
         }
         if(followIncludes) {
+            followedIncludes.push(this);
             for(let i of this.includes) {
                 const pf = collection.files[i.uri];
-                const isymbols = pf.getAllSymbols(collection, null, followIncludes);
+                if(followedIncludes.includes(pf)) continue
+                followedIncludes.push(pf);
+                const isymbols = pf.getAllSymbols(collection, null, followIncludes, false, followedIncludes, 'included ');
                 symbols = [...symbols, ...isymbols];
+            }
+            if(followOthers) {
+                for(let f in collection.files) {
+                    const pf = collection.files[f];
+                    if(followedIncludes.includes(pf)) continue;
+                    const isymbols = pf.getAllSymbols(collection, null, false, false, followedIncludes, 'external ');
+                    symbols = [...symbols, ...isymbols];    
+                }
             }
         }
         return symbols;
     }
 
-    getSymbol(collection: ParsedRoutinesCollection, name:string, line:number|null = null, followIncludes:boolean=false): Symbol|undefined {
+    getSymbol(collection: ParsedRoutinesCollection, name:string, line:number|null = null, followIncludes:boolean=false, followOthers:boolean=false, followedIncludes:Array<ParsedFile>=[], scopePrefix:string=''): Symbol|undefined {
         for(let s of this.subroutines) {
             if(line!=null && line>=s.start && line<s.end) {
                 if(s.args.has(name)) {
-                    return {object:s.args.get(name)!, file:this.file, scope:'subroutine argument'};
+                    return {object:s.args.get(name)!, file:this.file, scope:scopePrefix+'subroutine argument'};
                 }
             }
         }
         if(this.vars.has(name)) {
-            return {object:this.vars.get(name)!, file:this.file, scope:'global'};
+            return {object:this.vars.get(name)!, file:this.file, scope:scopePrefix+'global'};
         }
         for(let s of this.subroutines) {
             if(s.vars.has(name)) {
-                return {object:s.vars.get(name)!, file:this.file, scope:'subroutine-defined global'};
+                return {object:s.vars.get(name)!, file:this.file, scope:scopePrefix+'subroutine-defined global'};
             }
             if(name.toUpperCase() == s.name.toUpperCase()) {
-                return {object:s, file:this.file, scope:'global'};
+                return {object:s, file:this.file, scope:scopePrefix+'global'};
             }
         }
         if(followIncludes) {
+            followedIncludes.push(this);
             for(let i of this.includes) {
                 const pf = collection.files[i.uri];
-                const symbol = pf.getSymbol(collection, name, null, followIncludes);
+                if(followedIncludes.includes(pf)) continue
+                followedIncludes.push(pf);
+                const symbol = pf.getSymbol(collection, name, null, followIncludes, false, followedIncludes, 'included ');
                 if(symbol!==undefined) {
                     return symbol;
+                }
+            }
+            if(followOthers) {
+                for(let f in collection.files) {
+                    const pf = collection.files[f];
+                    if(followedIncludes.includes(pf)) continue;
+                    const symbol = pf.getSymbol(collection, name, null, false, false, followedIncludes, 'external ');
+                    if(symbol!==undefined) {
+                        return symbol;
+                    }
                 }
             }
         }

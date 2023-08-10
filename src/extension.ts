@@ -430,7 +430,7 @@ export function activate(context: vscode.ExtensionContext) {
           let obj = word.endsWith('.')? word : dottedMatch![0]; //Extract the parent object name
           obj = obj.slice(0,obj.length-1);//.toLowerCase();
           if(obj[0]==='!' || obj[0]==='%') return;
-          const symbol = file.getSymbol(parserCollection, obj, position.line, true);
+          const symbol = file.getSymbol(parserCollection, obj, position.line, true, true);
           if(symbol) {
             if(symbol.object instanceof ev.ParsedSub) {
               return;
@@ -524,7 +524,7 @@ export function activate(context: vscode.ExtensionContext) {
               }
             }
           }
-          const symbols = file.getAllSymbols(parserCollection, position.line, true);
+          const symbols = file.getAllSymbols(parserCollection, position.line, true, true);
           if(subCallMatch!==null) {
             //show user-defined subroutines after a call statement
             for(const symbol of symbols) {
@@ -602,7 +602,7 @@ export function activate(context: vscode.ExtensionContext) {
         const signatureHelp = new vscode.SignatureHelp();
         signatureHelp.activeParameter = lineSigData.argPos;
         if(lineSigData.sub) { //subroutine call
-          const symbol = file.getSymbol(parserCollection, callName, position.line, true);
+          const symbol = file.getSymbol(parserCollection, callName, position.line, true, true);
           if(symbol!==undefined && symbol.object instanceof ev.ParsedSub) {
             const sigData = subSigData(symbol.object);  
             const sig = new vscode.SignatureInformation(sigData.call, `Subroutine ${symbol.object.name}`);
@@ -617,7 +617,7 @@ export function activate(context: vscode.ExtensionContext) {
           const obj = lineSigData.obj;
           if(obj[0]==='!' || obj[0]==='%') return;
           concept = `${obj} property`;
-          const symbol = file.getSymbol(parserCollection, obj, position.line, true);
+          const symbol = file.getSymbol(parserCollection, obj, position.line, true, true);
           if(symbol) {
             if(!(symbol.object instanceof ev.ParsedSub) && !(symbol.object instanceof String) && !(typeof(symbol.object)==='string')) {
               const type = symbol.object.type.toLowerCase();
@@ -706,7 +706,7 @@ export function activate(context: vscode.ExtensionContext) {
             obj = obj.slice(0,obj.length-1);//.toLowerCase();
             if(obj[0]==='!' || obj[0]==='%') return new vscode.Hover(`Invalid "." operation on program variable ${obj}`);
             const file = parserCollection.files[document.uri.toString()];
-            const symbol = file.getSymbol(parserCollection, obj, position.line, true);
+            const symbol = file.getSymbol(parserCollection, obj, position.line, true, true);
             if(symbol) {
               if(symbol.object instanceof ev.ParsedSub) {
                 return;
@@ -732,7 +732,7 @@ export function activate(context: vscode.ExtensionContext) {
             return new vscode.Hover(new vscode.MarkdownString(`Unknown method of unknown object ${obj}`));
           }
           const file = parserCollection.files[document.uri.toString()];
-          const symbol = file.getSymbol(parserCollection, word, position.line, true);
+          const symbol = file.getSymbol(parserCollection, word, position.line, true, true);
           if(symbol) {
             if(symbol.object instanceof ev.ParsedSub) {
               const line = document.getText(new vscode.Range(lineStart,range.start)).trim().toUpperCase();
