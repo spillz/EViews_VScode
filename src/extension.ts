@@ -133,7 +133,7 @@ function getLineSigData(line:string): LineSigData|undefined {
   }
   const result:LineSigData = {};
   let argStart = parenLoc[parenLoc.length-1];
-  const funcMatch = line.slice(0, argStart).match(/[@]?[A-Z]\w+$/i);
+  const funcMatch = line.slice(0, argStart).match(/[@]?[A-Z]\w*$/i);
   if(!funcMatch) return {};
   result.funcPart = funcMatch[0];
   result.argPart = line.slice(argStart);
@@ -404,12 +404,12 @@ export function activate(context: vscode.ExtensionContext) {
         let dottedMatch:RegExpMatchArray|null;
         let subCallMatch:RegExpMatchArray|null;
         if(range!==undefined) {
-          word = document.getText(range);//.toLowerCase();
+          word = document.getText(range);
           dottedMatch = document.getText(new vscode.Range(lineStart, range.start))
                               .match(/[!%@]?(?:\{[%!][a-zA-Z_]\w*\}|[a-zA-Z_]\w*)(?:\{[%!][a-zA-Z_]\w*\}|\w*)*\.$/i);
-          subCallMatch = dottedMatch===null? 
+          subCallMatch = dottedMatch===null? //Subroutine call match should be non-null if cursor is after a "call " but before an opening parens "(" -- we will give hints for known subs if this is not null
                               document.getText(new vscode.Range(lineStart, range.start))
-                                      .match(/call\s+/i):
+                                      .match(/call\s+(?!\w+\()/i): 
                               null;
         } else {
           range = new vscode.Range(position, position);
@@ -418,10 +418,10 @@ export function activate(context: vscode.ExtensionContext) {
           dottedMatch = null;
           word = '';
         }
-        const prefixPos = new vscode.Position(lineStart.line, range.start.character -
-                    (dottedMatch!==null? dottedMatch[0].length:
-                    subCallMatch!==null? subCallMatch[0].length:
-                    0)
+        const prefixPos = new vscode.Position(lineStart.line, 
+                    (dottedMatch!==null? range.start.character - dottedMatch[0].length:
+                    subCallMatch!==null? subCallMatch.index! + subCallMatch[0].length:
+                    range.start.character)
         );
         const linePrefix = document.getText(new vscode.Range(lineStart, prefixPos));
         if(word.endsWith('.') || !word.endsWith('.') && word.length>0 && dottedMatch!==null) {
