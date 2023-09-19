@@ -281,7 +281,7 @@ export function activate(context: vscode.ExtensionContext) {
       use = use.replace(/\( /g,'(');
       use = use.replace(/ \)/g,')');
       use = use.replace(/\[ /g,'[');
-      use = use.split('\n').map((u)=>u.replace(RegExp('^.*?\\.\\s*('+kwd+')'), '$1')).join('\n'); //strips text before keywords
+      use = use.split('\n').map((u)=>u.replace(RegExp('^.*?('+kwd+')'), '$1')).join('\n'); //strips text before keywords. Old regexp version: RegExp('^.*?\\.\\s*('+kwd+')')
       if(use.length===0) use = kwd;
       const kwinfo: KeywordInfo = {
         usage: use,
@@ -341,7 +341,7 @@ export function activate(context: vscode.ExtensionContext) {
         if(uris && uris.length==1) {
           const uri = uris[0];
           if(path.extname(uri.fsPath)==='.exe') {
-            vscode.workspace.getConfiguration('eviews-language-extension').update('eviews-path', uri.fsPath);
+            vscode.workspace.getConfiguration('eviews-language-extension').update('eviews-path', uri.fsPath, vscode.ConfigurationTarget.Global);
             vscode.commands.executeCommand("eviews.runEViews");
           }
         }
