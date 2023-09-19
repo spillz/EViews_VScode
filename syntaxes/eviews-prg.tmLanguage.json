@@ -41,12 +41,20 @@
 		},
 		"keywords": {
 			"name": "keyword",
-			"match": "\\b(?i)(call|else|endif|endsub|exitloop|for|if|include|next|return|sleep|step|stop|subroutine|then|to|wend|while)\\b"
+			"match": "^(?i)\\s+(call|else|endif|endsub|exitloop|for|if|include|next|return|sleep|stop|subroutine|wend|while)\\b"
+		},
+		"extkeywords": {
+			"name": "keyword",
+			"match": "\\b(?i)(then|to|step)\\b"			
 		},
 		"strings": {
 			"name": "string",
 			"begin": "\"",
 			"end": "\""
+		},
+		"commands": {
+			"name": "command",
+			"match": "^\\s*(\\w+)(.*)$"
 		},
 		"scalars": {
 			"match":
