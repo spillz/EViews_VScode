@@ -18,9 +18,9 @@ In VS Code (or your command line tools of choice) clone the extension github rep
 
 ```
 cd <location of cloned repository>
-npm install -g vsce
+npm install -g @vscode/vsce
 npm install
-vsce package
+npx vsce package
 ```
 
 That should produce a `eviews-language-extensions-<version>.vsix` extension.
@@ -64,3 +64,25 @@ Updates for missing EViews builtins, more hover links to files and definitions, 
 ### 0.2.6
 
 Bugfixes on case handling of symbols in subroutines. Copy command as variable definitions. No hints on "." operator for program variables.
+
+### 0.2.7
+
+Adjust symbol resolution priority (EViews keywords vs user defined symbols).
+
+### 0.2.8
+
+Support "subroutine local"
+Update for URL changes to EViews online help
+Include hover over path will resolve clickable link to path (previously only if you hovered over the include keyword)
+JSDOC-style docstring type definitions on the lines above referenced variables to improve completions. 
+ 
+    Examples:
+
+    ```
+        '@type table
+        myTable(1,3) = @value("100")
+
+        '@type myTable=table a=scalar d=vector
+        a = d(3)
+
+    ```

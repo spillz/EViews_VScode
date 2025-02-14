@@ -92,12 +92,27 @@ const program_snippets:{[keyword:string]:Snip} = {
       "usage": "call <sub_name>[(<arg1>, <arg2>, ...)]",
       "description": "A subroutine call."
     }  
+  },
+  "type": {
+    "Type Annotations: Multiple": {
+      "prefix": "type#multiannotation",
+      "body": ["'@type ${1:varname1}=>${2:typename1} ${3:varname2=>typename2 ...}"], 
+      "usage": "'@type <varname1>=><typename1> [<varname2>=><typename2> <varname3>=><typename3> ...]",
+      "description": "Declares the types of one or more variables used in the program"
+    },
+    "Type Annotation: Next Line": {
+      "prefix": "type#annotation",
+      "body": ["'@type ${1:typename}"], 
+      "usage": "'@type <type_name>",
+      "description": "Declares the type of the EViews object being assigned on the next line"
+    }
   }
 }
 
 type SigData = {
   call:string,
   args:Array<{label:string, description?:string}>  
+  type:string,
 }
 
 type LineSigData = {funcPart?:string, argPart?:string, argPos?:number, obj?:string, sub?:string}
@@ -181,11 +196,13 @@ function getParamLoc(argPart:string): number {
 
 function subSigData(sub:ev.ParsedSub):SigData {
   const argPart = sub.args.map((a)=>`${a.type.toLowerCase()} ${a.name}`).join(', ');
-  const call = sub.args.length>0? `call ${sub.name}(${argPart})`:`call ${sub.name}`;
+  const call = sub.args.length>0? `${sub.name}(${argPart})`:`${sub.name}`;
+  const type = sub.local ? 'Subroutine local' : 'Subroutine';
   const args = sub.args.map((a)=>{return {label:a.name, description:`${a.name} (${a.type.toLowerCase()}): `+((a.lookupName in sub.docString.args)?sub.docString.args[a.lookupName]:'_no description_')};});
   return {
     call: call,
     args: args,
+    type: type,
   };
 }
 
@@ -249,7 +266,7 @@ type KeywordInfo = {
 
 function docUri(kwi:KeywordInfo) {
   const end = kwi.anchor===''?kwi.uri+'.html':kwi.uri+'.html%23'+kwi.anchor;
-  return 'https://help.eviews.com/#page/content/'+end;
+  return 'https://help.eviews.com/helpintro.html#page/content/'+end;
 }
 
 type EViewsGroupKeywords = {[keyword:string]:KeywordInfo};
@@ -293,6 +310,15 @@ export function activate(context: vscode.ExtensionContext) {
       eviewsGroups[grp][kwd] = kwinfo;
     }
   };
+  const extGrpKW:EViewsGroupKeywords = {};
+  extGrpKW['@type'] = {
+    usage: '@type ${1:<varname1>}=>${2:<typename1>} ${3:[<varname2>=><typename2> <varname3>=><typename3> ...]}',
+    description: 'Annotates the types of one or more variables used in the program.',
+    longDescription: 'Type annotations are an extension of the EViews language to improve usability of the VS Code extension. Use an annotation to declare the types of variables that may exist in a workfile or are decalred in an external module. Annotations are put in a comment line starting with "\'@type".',
+    uri: 'cobjects.html',
+    anchor: '@type'
+  }
+  eviewsGroups['VS Code Extension'] = extGrpKW;
 
   let disposable;
   
@@ -397,16 +423,24 @@ export function activate(context: vscode.ExtensionContext) {
       provideCompletionItems(document: TextDocument, position: Position, token: CancellationToken, context: vscode.CompletionContext): 
                     vscode.ProviderResult<vscode.CompletionItem[] | vscode.CompletionList<vscode.CompletionItem>> {
         const items:vscode.CompletionItem[] = [];
-        let range = document.getWordRangeAtPosition(position, /([!%@]?(?:\{[%!][a-zA-Z_]\w*\}|[a-zA-Z_]\w*)(?:\{[%!][a-zA-Z_]\w*\}|\w*)*\.?|[!%@])/i);
+        let range = document.getWordRangeAtPosition(position, /((?<=')@\w*|(?<==>)\w*|[!%@]?(?:\{[%!][a-z_]\w*\}|[a-z_]\w*)(?:\{[%!][a-z_]\w*\}|\w*)*\.?|[!%@])/i);
         const file = parserCollection.files[document.uri.toString()];
         const lineStart = new vscode.Position(position.line,0);
+        const line = document.lineAt(lineStart).text;
         let word:string;
         let dottedMatch:RegExpMatchArray|null;
+        let arrowMatch:RegExpMatchArray|null;
         let subCallMatch:RegExpMatchArray|null;
+        let commentAnnotation = false;
         if(range!==undefined) {
           word = document.getText(range);
+          if(range.start.character>0) {
+            commentAnnotation = document.getText(new vscode.Range(new vscode.Position(range.start.line, range.start.character-1), range.start))==="'";
+          }
           dottedMatch = document.getText(new vscode.Range(lineStart, range.start))
                               .match(/[!%@]?(?:\{[%!][a-zA-Z_]\w*\}|[a-zA-Z_]\w*)(?:\{[%!][a-zA-Z_]\w*\}|\w*)*\.$/i);
+          arrowMatch = document.getText(new vscode.Range(lineStart, range.start))
+                              .match(/[!%@]?(?:\{[%!][a-zA-Z_]\w*\}|[a-zA-Z_]\w*)(?:\{[%!][a-zA-Z_]\w*\}|\w*)*=>$/i);
           subCallMatch = dottedMatch===null? //Subroutine call match should be non-null if cursor is after a "call " but before an opening parens "(" -- we will give hints for known subs if this is not null
                               document.getText(new vscode.Range(lineStart, range.start))
                                       .match(/call\s+(?!\w+\()/i): 
@@ -416,6 +450,7 @@ export function activate(context: vscode.ExtensionContext) {
           subCallMatch = document.getText(new vscode.Range(lineStart, position)).match(/call\s+/i);
           if(subCallMatch===null) return;
           dottedMatch = null;
+          arrowMatch = null;
           word = '';
         }
         const prefixPos = new vscode.Position(lineStart.line, 
@@ -424,148 +459,203 @@ export function activate(context: vscode.ExtensionContext) {
                     range.start.character)
         );
         const linePrefix = document.getText(new vscode.Range(lineStart, prefixPos));
-        if(word.endsWith('.') || !word.endsWith('.') && word.length>0 && dottedMatch!==null) {
-          //Trigger for method completion is either a . or beginning of a word after a .
-          if(word.endsWith('.')) range = document.getWordRangeAtPosition(position); //Reposition the insertion range to be after the "."
-          let obj = word.endsWith('.')? word : dottedMatch![0]; //Extract the parent object name
-          obj = obj.slice(0,obj.length-1);//.toLowerCase();
-          if(obj[0]==='!' || obj[0]==='%') return;
-          const symbol = file.getSymbol(parserCollection, obj, position.line, true, true);
-          if(symbol) {
-            if(symbol.object instanceof ev.ParsedSub) {
-              return;
-            }
-            else if(symbol.object instanceof String || typeof(symbol.object)==='string') {
-              return;
-            } else { //Variable
-              const type = symbol.object.type.toLowerCase();
-              const capType = type[0].toUpperCase()+type.slice(1);
-              if(capType in eviewsGroups) {
-                for(let meth in eviewsGroups[capType]) {
-                  const info = eviewsGroups[capType][meth]
-                  if(meth[0]==='[') continue; //Skip the object definition entry, it's not a method
-                  if(meth[0]==='@') { //object properties
-                    const ci = new vscode.CompletionItem(meth, vscode.CompletionItemKind.Method);
-                    ci.documentation = new vscode.MarkdownString(`${capType} method ${meth}`+'\n\n'+info['description']+`\n\nEviews help: [${meth}](${docUri(info)})`);
-                    ci.documentation.isTrusted = true;
-                    ci.detail = eviewsGroups[capType][meth]['usage'].split('\n').join(' | ');
-                    ci.range = range;
-                    ci.preselect = true;
-                    items.push(ci);          
-                  } else { //object commands
-                    const usage = eviewsGroups[capType][meth]['usage'];
-                    for(const use of usageSnippets(usage, meth)) {
-                      if(use[0].trim().length>0) {
-                        const ci = new vscode.CompletionItem(meth, vscode.CompletionItemKind.Method);
-                        ci.documentation = new vscode.MarkdownString(`${capType} method ${meth}`+'\n\n'+info['description']+`\n\nEviews help: [${meth}](${docUri(info)})`);
-                        ci.documentation.isTrusted = true;
-                        ci.detail = use[0];
-                        ci.range = range;
-                        ci.insertText = use[1];
-                        ci.preselect = true;  
-                        items.push(ci);            
-                      }
-                    }  
-                  }
-                }
-              }
+        if(commentAnnotation) { //Comment scope
+          for(let concept of ['VS Code Extension']) {
+            for(const kw in eviewsGroups[concept]) {
+              if(kw[0]=='[') continue;
+              const info = eviewsGroups[concept][kw]
+              const ci = new vscode.CompletionItem(kw, vscode.CompletionItemKind.Function);
+              ci.documentation = new vscode.MarkdownString(eviewsGroups[concept][kw]['description']+`\n\nEviews help: [${kw}](${docUri(info)})`);
+              ci.documentation.isTrusted = true;
+              ci.detail = info['usage'].split('\n').join(' | ');
+              ci.range = range;
+              ci.insertText = new vscode.SnippetString(info.usage);
+              items.push(ci);
             }
           }
-          if(items.length==0) {
-            const ci = new vscode.CompletionItem('<No methods available for unknown object type>', vscode.CompletionItemKind.Method);
-            items.push(ci);
-          }
-        } else {
-          if(linePrefix.trim().length==0 && subCallMatch===null) {
-            //Programming steps and commands -- all appear at the start of a line (we handle CALL separately)
-            for(let concept of ['Programming','Commands']) { //Commands -- todo, these should only trigger at the start of a line
-              for(const kw in eviewsGroups[concept]) {
-                if(kw[0]=='[') continue;
-                const info = eviewsGroups[concept][kw];
-                if(kw in program_snippets) {
-                  const snips = program_snippets[kw];
-                  for(const s in snips) {
-                    const snipData = snips[s];
-                    const ci = new vscode.CompletionItem(snipData["prefix"], vscode.CompletionItemKind.Keyword);
-                    ci.documentation = new vscode.MarkdownString(snipData['description']+`\n\nEviews help: [${kw}](${docUri(info)})`);
-                    ci.documentation.isTrusted = true;
-                    ci.detail = snipData['usage'] //eviewsGroups[concept][kw]['usage'].split('\n').join(' | ');
-                    ci.range = range;  
-                    ci.insertText = new vscode.SnippetString(snipData['body'].join('\n'));
-                    items.push(ci);
-                  }
-                } else {
-                  const usage = eviewsGroups[concept][kw]['usage'];
-                  for(let use of usageSnippets(usage, kw)) {
-                    const ci = new vscode.CompletionItem(kw, vscode.CompletionItemKind.Keyword);
-                    ci.documentation = new vscode.MarkdownString(eviewsGroups[concept][kw]['description']+`\n\nEviews help: [${kw}](${docUri(info)})`);
-                    ci.documentation.isTrusted = true;
-                    ci.detail = use[0] //eviewsGroups[concept][kw]['usage'].split('\n').join(' | ');
-                    ci.range = range;
-                    ci.insertText = use[1];
-                    items.push(ci);    
-                  }  
-                }
-              }
-            }  
-          }
-          if(subCallMatch===null) {
-            //Functions -- we'll show anywhere except after a call statement
-            for(let concept of ['Element Information','Functions','Operators','General Information','Basic Workfile Functions','Dated Workfile Information','Panel Workfile Functions']) {
-              for(const kw in eviewsGroups[concept]) {
-                if(kw[0]=='[') continue;
-                const info = eviewsGroups[concept][kw]
-                const ci = new vscode.CompletionItem(kw, vscode.CompletionItemKind.Function);
-                ci.documentation = new vscode.MarkdownString(eviewsGroups[concept][kw]['description']+`\n\nEviews help: [${kw}](${docUri(info)})`);
+        }
+        if (line.trim().toUpperCase().startsWith("'@TYPE ")) {
+          if(arrowMatch) {
+            for (let tp in eviewsGroups) {
+              if (ev.eviewsTypes.includes(tp.toUpperCase())) {
+                const info = eviewsGroups[tp][`[${tp}]`];
+                if (info === undefined) continue;
+                const ci = new vscode.CompletionItem(tp, vscode.CompletionItemKind.TypeParameter);
+                ci.documentation = new vscode.MarkdownString(`Type annotation for ${tp}`+'\n\n'+info['description']+`\n\nEviews help: [${tp}](${docUri(info)})`);
                 ci.documentation.isTrusted = true;
-                ci.detail = eviewsGroups[concept][kw]['usage'].split('\n').join(' | ');
+                ci.detail = info['usage'].split('\n').join(' | ');
                 ci.range = range;
+                ci.preselect = true;
                 items.push(ci);
               }
             }
+            return items;
           }
           const symbols = file.getAllSymbols(parserCollection, position.line, true, true);
-          if(subCallMatch!==null) {
-            //show user-defined subroutines after a call statement
-            for(const symbol of symbols) {
+            //otherwise show user-defined objects and variables
+          for(const symbol of symbols) {
+            if(symbol.object instanceof String || typeof(symbol.object)==='string' || symbol.object instanceof ev.ParsedSub) continue;
+            const name = symbol.object.name;
+            const type = symbol.object.type.toLowerCase();
+            const scope = symbol.scope;
+            const capType = type[0].toUpperCase()+type.slice(1);
+            if(`[${capType}]` in eviewsGroups[capType]) {
+              const info = eviewsGroups[capType][`[${capType}]`];
+              const ci = new vscode.CompletionItem(name, vscode.CompletionItemKind.Function);
+              const fileInfo = file.file.toString()===symbol.file.toString()? '':`\n\nDefined in [${path.basename(symbol.file.fsPath)}](${symbol.file.toString()})`;
+              ci.documentation = new vscode.MarkdownString(`${info.description}`+fileInfo);
+              ci.documentation.isTrusted = true;
+              ci.detail = `${capType} ${name} (${scope})`;
+              ci.range = range;
+              items.push(ci);
+            }
+          }  
+          return items;
+        }
+        if (word[0]!=="'" && line.trim()[0]!=="'") {
+          if(word.endsWith('.') || !word.endsWith('.') && word.length>0 && dottedMatch!==null) {
+            //Trigger for method completion is either a . or beginning of a word after a .
+            if(word.endsWith('.')) range = document.getWordRangeAtPosition(position); //Reposition the insertion range to be after the "."
+            let obj = word.endsWith('.')? word : dottedMatch![0]; //Extract the parent object name
+            obj = obj.slice(0,obj.length-1);//.toLowerCase();
+            if(obj[0]==='!' || obj[0]==='%') return;
+            const symbol = file.getSymbol(parserCollection, obj, position.line, true, true);
+            if(symbol) {
               if(symbol.object instanceof ev.ParsedSub) {
-                const name = symbol.object.name;//.toLowerCase();
-                const type = 'subroutine';
-                const scope = symbol.scope;
+                return;
+              }
+              else if(symbol.object instanceof String || typeof(symbol.object)==='string') {
+                return;
+              } else { //Variable
+                const type = symbol.object.type.toLowerCase();
                 const capType = type[0].toUpperCase()+type.slice(1);
-                const concept = 'Programming';
-                if(type in eviewsGroups[concept]) {
-                  const info = eviewsGroups[concept][type];
-                  const ci = new vscode.CompletionItem(name, vscode.CompletionItemKind.Function);
-                  const fileInfo = file.file.toString()===symbol.file.toString()? '':`\n\nDefined in [${path.basename(symbol.file.fsPath)}:${symbol.object.start+1}](${symbol.file.toString()}#L${symbol.object.start+1})`;
-                  ci.documentation = new vscode.MarkdownString(`${capType}: ${info.description}`+fileInfo);
+                if(capType in eviewsGroups) {
+                  for(let meth in eviewsGroups[capType]) {
+                    const info = eviewsGroups[capType][meth]
+                    if(meth[0]==='[') continue; //Skip the object definition entry, it's not a method
+                    if(meth[0]==='@') { //object properties
+                      const ci = new vscode.CompletionItem(meth, vscode.CompletionItemKind.Method);
+                      ci.documentation = new vscode.MarkdownString(`${capType} method ${meth}`+'\n\n'+info['description']+`\n\nEviews help: [${meth}](${docUri(info)})`);
+                      ci.documentation.isTrusted = true;
+                      ci.detail = eviewsGroups[capType][meth]['usage'].split('\n').join(' | ');
+                      ci.range = range;
+                      ci.preselect = true;
+                      items.push(ci);          
+                    } else { //object commands
+                      const usage = eviewsGroups[capType][meth]['usage'];
+                      for(const use of usageSnippets(usage, meth)) {
+                        if(use[0].trim().length>0) {
+                          const ci = new vscode.CompletionItem(meth, vscode.CompletionItemKind.Method);
+                          ci.documentation = new vscode.MarkdownString(`${capType} method ${meth}`+'\n\n'+info['description']+`\n\nEviews help: [${meth}](${docUri(info)})`);
+                          ci.documentation.isTrusted = true;
+                          ci.detail = use[0];
+                          ci.range = range;
+                          ci.insertText = use[1];
+                          ci.preselect = true;  
+                          items.push(ci);            
+                        }
+                      }  
+                    }
+                  }
+                }
+              }
+            }
+            if(items.length==0) {
+              const ci = new vscode.CompletionItem('<No methods available for unknown object type>', vscode.CompletionItemKind.Method);
+              items.push(ci);
+            }
+          } else {
+            if(linePrefix.trim().length==0 && subCallMatch===null) {
+              //Programming steps and commands -- all appear at the start of a line (we handle CALL separately)
+              for(let concept of ['Programming','Commands']) { //Commands -- todo, these should only trigger at the start of a line
+                for(const kw in eviewsGroups[concept]) {
+                  if(kw[0]=='[') continue;
+                  const info = eviewsGroups[concept][kw];
+                  if(kw in program_snippets) {
+                    const snips = program_snippets[kw];
+                    for(const s in snips) {
+                      const snipData = snips[s];
+                      const ci = new vscode.CompletionItem(snipData["prefix"], vscode.CompletionItemKind.Keyword);
+                      ci.documentation = new vscode.MarkdownString(snipData['description']+`\n\nEviews help: [${kw}](${docUri(info)})`);
+                      ci.documentation.isTrusted = true;
+                      ci.detail = snipData['usage'] //eviewsGroups[concept][kw]['usage'].split('\n').join(' | ');
+                      ci.range = range;  
+                      ci.insertText = new vscode.SnippetString(snipData['body'].join('\n'));
+                      items.push(ci);
+                    }
+                  } else {
+                    const usage = eviewsGroups[concept][kw]['usage'];
+                    for(let use of usageSnippets(usage, kw)) {
+                      const ci = new vscode.CompletionItem(kw, vscode.CompletionItemKind.Keyword);
+                      ci.documentation = new vscode.MarkdownString(eviewsGroups[concept][kw]['description']+`\n\nEviews help: [${kw}](${docUri(info)})`);
+                      ci.documentation.isTrusted = true;
+                      ci.detail = use[0] //eviewsGroups[concept][kw]['usage'].split('\n').join(' | ');
+                      ci.range = range;
+                      ci.insertText = use[1];
+                      items.push(ci);    
+                    }  
+                  }
+                }
+              }  
+            }
+            if(subCallMatch===null) {
+              //Functions -- we'll show anywhere except after a call statement
+              for(let concept of ['VS Code Extension','Element Information','Functions','Operators','General Information','Basic Workfile Functions','Dated Workfile Information','Panel Workfile Functions']) {
+                for(const kw in eviewsGroups[concept]) {
+                  if(kw[0]=='[') continue;
+                  const info = eviewsGroups[concept][kw]
+                  const ci = new vscode.CompletionItem(kw, vscode.CompletionItemKind.Function);
+                  ci.documentation = new vscode.MarkdownString(eviewsGroups[concept][kw]['description']+`\n\nEviews help: [${kw}](${docUri(info)})`);
                   ci.documentation.isTrusted = true;
-                  ci.detail = `${capType} ${name} (${scope})`;
+                  ci.detail = eviewsGroups[concept][kw]['usage'].split('\n').join(' | ');
                   ci.range = range;
-                  ci.preselect = true;
                   items.push(ci);
                 }
               }
             }
-          } else {
-            //otherwise show user-defined objects and variables
-            for(const symbol of symbols) {
-              if(symbol.object instanceof String || typeof(symbol.object)==='string' || symbol.object instanceof ev.ParsedSub) continue;
-              const name = symbol.object.name;
-              const type = symbol.object.type.toLowerCase();
-              const scope = symbol.scope;
-              const capType = type[0].toUpperCase()+type.slice(1);
-              if(`[${capType}]` in eviewsGroups[capType]) {
-                const info = eviewsGroups[capType][`[${capType}]`];
-                const ci = new vscode.CompletionItem(name, vscode.CompletionItemKind.Function);
-                const fileInfo = file.file.toString()===symbol.file.toString()? '':`\n\nDefined in [${path.basename(symbol.file.fsPath)}](${symbol.file.toString()})`;
-                ci.documentation = new vscode.MarkdownString(`${info.description}`+fileInfo);
-                ci.documentation.isTrusted = true;
-                ci.detail = `${capType} ${name} (${scope})`;
-                ci.range = range;
-                items.push(ci);
+            const symbols = file.getAllSymbols(parserCollection, position.line, true, true);
+            if(subCallMatch!==null) {
+              //show user-defined subroutines after a call statement
+              for(const symbol of symbols) {
+                if(symbol.object instanceof ev.ParsedSub) {
+                  const name = symbol.object.name;//.toLowerCase();
+                  const type = 'subroutine';
+                  const scope = symbol.scope;
+                  const capType = type[0].toUpperCase()+type.slice(1);
+                  const concept = 'Programming';
+                  if(type in eviewsGroups[concept]) {
+                    const info = eviewsGroups[concept][type];
+                    const ci = new vscode.CompletionItem(name, vscode.CompletionItemKind.Function);
+                    const fileInfo = file.file.toString()===symbol.file.toString()? '':`\n\nDefined in [${path.basename(symbol.file.fsPath)}:${symbol.object.start+1}](${symbol.file.toString()}#L${symbol.object.start+1})`;
+                    ci.documentation = new vscode.MarkdownString(`${capType}: ${info.description}`+fileInfo);
+                    ci.documentation.isTrusted = true;
+                    ci.detail = `${capType} ${name} (${scope})`;
+                    ci.range = range;
+                    ci.preselect = true;
+                    items.push(ci);
+                  }
+                }
               }
-            }  
+            } else {
+              //otherwise show user-defined objects and variables
+              for(const symbol of symbols) {
+                if(symbol.object instanceof String || typeof(symbol.object)==='string' || symbol.object instanceof ev.ParsedSub) continue;
+                const name = symbol.object.name;
+                const type = symbol.object.type.toLowerCase();
+                const scope = symbol.scope;
+                const capType = type[0].toUpperCase()+type.slice(1);
+                if(`[${capType}]` in eviewsGroups[capType]) {
+                  const info = eviewsGroups[capType][`[${capType}]`];
+                  const ci = new vscode.CompletionItem(name, vscode.CompletionItemKind.Function);
+                  const fileInfo = file.file.toString()===symbol.file.toString()? '':`\n\nDefined in [${path.basename(symbol.file.fsPath)}](${symbol.file.toString()})`;
+                  ci.documentation = new vscode.MarkdownString(`${info.description}`+fileInfo);
+                  ci.documentation.isTrusted = true;
+                  ci.detail = `${capType} ${name} (${scope})`;
+                  ci.range = range;
+                  items.push(ci);
+                }
+              }  
+            }
           }
         }
         return items;
@@ -578,6 +668,7 @@ export function activate(context: vscode.ExtensionContext) {
     '.',
     '%',
     '!',
+    '>',
   );
   const sprov = vscode.languages.registerSignatureHelpProvider(
     'eviews-prg',
@@ -605,7 +696,7 @@ export function activate(context: vscode.ExtensionContext) {
           const symbol = file.getSymbol(parserCollection, callName, position.line, true, true);
           if(symbol!==undefined && symbol.object instanceof ev.ParsedSub) {
             const sigData = subSigData(symbol.object);  
-            const sig = new vscode.SignatureInformation(sigData.call, `Subroutine ${symbol.object.name}`);
+            const sig = new vscode.SignatureInformation(sigData.call, `${sigData.type} ${symbol.object.name}`);
             for(const arg of sigData.args) {
               sig.parameters.push(new vscode.ParameterInformation(arg.label, arg.description));
             }
@@ -699,95 +790,114 @@ export function activate(context: vscode.ExtensionContext) {
           const wordAsTyped = document.getText(range); 
           const word = wordAsTyped.toLowerCase();
           const lineStart = new vscode.Position(range.start.line,0);
+          const line = document.lineAt(range.start.line).text;
+          const include = line.match(/include\s+["](.*)["]/i);
           const dottedMatch = document.getText(new vscode.Range(lineStart, range.start))
                               .match(/[!%@]?(?:\{[%!][a-zA-Z_]\w*\}|[a-zA-Z_]\w*)(?:\{[%!][a-zA-Z_]\w*\}|\w*)*\.$/i);
-          if(word.length>0 && dottedMatch) { //Trigger for method info hover is two adjoining words separated by a . -- todo: don't hover if the word to the left starts with @
-            let obj = dottedMatch[0]; //Extract the parent object name
-            obj = obj.slice(0,obj.length-1);//.toLowerCase();
-            if(obj[0]==='!' || obj[0]==='%') return new vscode.Hover(`Invalid "." operation on program variable ${obj}`);
+          if(include===null) { 
+            if (word.length>0 && dottedMatch) { //Trigger for method info hover is two adjoining words separated by a . -- todo: don't hover if the word to the left starts with @
+              let obj = dottedMatch[0]; //Extract the parent object name
+              obj = obj.slice(0,obj.length-1);//.toLowerCase();
+              if(obj[0]==='!' || obj[0]==='%') return new vscode.Hover(`Invalid "." operation on program variable ${obj}`);
+              const file = parserCollection.files[document.uri.toString()];
+              const symbol = file.getSymbol(parserCollection, obj, position.line, true, true);
+              if(symbol) {
+                if(symbol.object instanceof ev.ParsedSub) {
+                  return;
+                }
+                else if(symbol.object instanceof String || typeof(symbol.object)==='string') {
+                  return;
+                } else { //Variable
+                  const type = symbol.object.type.toLowerCase();
+                  const capType = type[0].toUpperCase()+type.slice(1);
+                  if(capType in eviewsGroups) {
+                    if(word in eviewsGroups[capType]) {
+                      const info = eviewsGroups[capType][word];
+                      const header = `${capType} method ${word}`;
+                      const desc = info['description'];
+                      const usage = info['usage'];
+                      const contents = new vscode.MarkdownString(`${header}\n\nUsage: ${usage}\n\n${desc}\n\nEviews help: [${word}](${docUri(info)})`);
+                      contents.isTrusted = true;
+                      return new vscode.Hover(contents);
+                    }
+                  }  
+                }
+              }
+              return new vscode.Hover(new vscode.MarkdownString(`Unknown method of unknown object ${obj}`));
+            }
             const file = parserCollection.files[document.uri.toString()];
-            const symbol = file.getSymbol(parserCollection, obj, position.line, true, true);
+            const symbol = file.getSymbol(parserCollection, word, position.line, true, true);
             if(symbol) {
               if(symbol.object instanceof ev.ParsedSub) {
-                return;
-              }
-              else if(symbol.object instanceof String || typeof(symbol.object)==='string') {
-                return;
-              } else { //Variable
-                const type = symbol.object.type.toLowerCase();
-                const capType = type[0].toUpperCase()+type.slice(1);
-                if(capType in eviewsGroups) {
-                  if(word in eviewsGroups[capType]) {
-                    const info = eviewsGroups[capType][word];
-                    const header = `${capType} method ${word}`;
-                    const desc = info['description'];
-                    const usage = info['usage'];
-                    const contents = new vscode.MarkdownString(`${header}\n\nUsage: ${usage}\n\n${desc}\n\nEviews help: [${word}](${docUri(info)})`);
+                const line = document.getText(new vscode.Range(lineStart,range.start)).trim().toUpperCase();
+                if(line.startsWith('CALL') || line.startsWith('SUBROUTINE')) {
+                  const name = symbol.object.name;
+                  const type = 'subroutine';
+                  const scope = symbol.scope;
+                  const capType = type[0].toUpperCase()+type.slice(1);
+                  const concept = 'Programming';
+                  if(type in eviewsGroups[concept]) {
+                    const info = eviewsGroups[concept][type];
+                    const desc = info.description;
+                    const fileInfo = file.file.toString()===symbol.file.toString()? `\n\nDefined on [line ${symbol.object.start+1}](${symbol.file.toString()}#L${symbol.object.start+1})`:
+                      `\n\nDefined in [${path.basename(symbol.file.fsPath)}:${symbol.object.start+1}](${symbol.file.toString()}#L${symbol.object.start+1})`;
+                    const sigData = subSigData(symbol.object);
+                    const docString = subDocString(symbol.object);
+                    const contents = new vscode.MarkdownString(`${sigData.type} ${sigData.call} (${scope})${fileInfo}\n\n${docString}\n\n---\n\n${capType}: ${desc}\n\nEviews help: [${capType}](${docUri(info)})`);  
                     contents.isTrusted = true;
                     return new vscode.Hover(contents);
-                  }
-                }  
+                  }  
+                }
               }
-            }
-            return new vscode.Hover(new vscode.MarkdownString(`Unknown method of unknown object ${obj}`));
-          }
-          const file = parserCollection.files[document.uri.toString()];
-          const symbol = file.getSymbol(parserCollection, word, position.line, true, true);
-          if(symbol) {
-            if(symbol.object instanceof ev.ParsedSub) {
-              const line = document.getText(new vscode.Range(lineStart,range.start)).trim().toUpperCase();
-              if(line.startsWith('CALL') || line.startsWith('SUBROUTINE')) {
-                const name = symbol.object.name;
-                const type = 'subroutine';
-                const scope = symbol.scope;
-                const capType = type[0].toUpperCase()+type.slice(1);
-                const concept = 'Programming';
-                if(type in eviewsGroups[concept]) {
-                  const info = eviewsGroups[concept][type];
-                  const desc = info.description;
-                  const fileInfo = file.file.toString()===symbol.file.toString()? `\n\nDefined on [line ${symbol.object.start+1}](${symbol.file.toString()}#L${symbol.object.start+1})`:
-                    `\n\nDefined in [${path.basename(symbol.file.fsPath)}:${symbol.object.start+1}](${symbol.file.toString()}#L${symbol.object.start+1})`;
-                  const sigData = subSigData(symbol.object);
-                  const docString = subDocString(symbol.object);
-                  const contents = new vscode.MarkdownString(`${capType} ${sigData.call} (${scope})${fileInfo}\n\n${docString}\n\n---\n\n${capType}: ${desc}\n\nEviews help: [${capType}](${docUri(info)})`);  
-                  contents.isTrusted = true;
-                  return new vscode.Hover(contents);
-                }  
-              }
-            }
-            else if(symbol.object instanceof String || typeof(symbol.object)==='string') {
+              else if(symbol.object instanceof String || typeof(symbol.object)==='string') {
 
-            }
-            else { //Variable
-              const line = document.getText(new vscode.Range(lineStart,range.start)).trim().toUpperCase();
-              const lineEnd = document.getText(new vscode.Range(range.end, document.lineAt(range.end.line).range.end)).trim().toUpperCase();
-              //show user defined symbols for program vars, words after the first on the line, dot operations, or assignments (with optional params)
-              if(word[0]==='%'||word[0]==='!'||line.match(/^[!%]?[A-Za-z]/)||lineEnd.match(/^(:?\(.*?\))?(\.|\s*=)/)) { 
-                const name = symbol.object.name;
-                const type = symbol.object.type.toLowerCase();
-                const scope = symbol.scope;
-                const capType = type[0].toUpperCase()+type.slice(1);
-                const concept = 'Commands';
-                if(`[${capType}]` in eviewsGroups[capType]) {
-                  const info = eviewsGroups[capType][`[${capType}]`];
-                  const desc = info.description;
-                  const fileInfo = file.file.toString()===symbol.file.toString()? `\n\nFirst defined on [line ${symbol.object.line+1}](${symbol.file.toString()}#L${symbol.object.line+1})`:
-                    `\n\nFirst defined in [${path.basename(symbol.file.fsPath)}:${symbol.object.line+1}](${symbol.file.toString()}#L${symbol.object.line+1})`;
-                  const contents = new vscode.MarkdownString(`${capType} ${symbol.object.name} (${scope})${fileInfo}\n\n${desc}\n\nEviews help: [${capType}](${docUri(info)})`);  
-                  contents.isTrusted = true;
-                  return new vscode.Hover(contents);
-                }  
+              }
+              else { //Variable
+                const line = document.getText(new vscode.Range(lineStart,range.start)).trim().toUpperCase();
+                const lineEnd = document.getText(new vscode.Range(range.end, document.lineAt(range.end.line).range.end)).trim().toUpperCase();
+                //show user defined symbols for program vars, words after the first on the line, dot operations, or assignments (with optional params)
+                if(word[0]==='%'||word[0]==='!'||line.match(/^[!%]?[A-Za-z]/)||lineEnd.match(/^(:?\(.*?\))?(\.|\s*=)/)) { 
+                  const name = symbol.object.name;
+                  const type = symbol.object.type.toLowerCase();
+                  const scope = symbol.scope;
+                  const capType = type[0].toUpperCase()+type.slice(1);
+                  const concept = 'Commands';
+                  if(`[${capType}]` in eviewsGroups[capType]) {
+                    const info = eviewsGroups[capType][`[${capType}]`];
+                    const desc = info.description;
+                    const by = symbol.object.annotatedType ? ' by annotation':'';
+                    const fileInfo = file.file.toString()===symbol.file.toString()? `\n\nFirst defined${by} on [line ${symbol.object.line+1}](${symbol.file.toString()}#L${symbol.object.line+1})`:
+                      `\n\nFirst defined in [${path.basename(symbol.file.fsPath)}:${symbol.object.line+1}](${symbol.file.toString()}#L${symbol.object.line+1})`;
+                    const contents = new vscode.MarkdownString(`${capType} ${symbol.object.name} (${scope})${fileInfo}\n\n${desc}\n\nEviews help: [${capType}](${docUri(info)})`);  
+                    contents.isTrusted = true;
+                    return new vscode.Hover(contents);
+                  }  
+                }
               }
             }
           }
           let extraDocs = '';
-          if(word==='include') { //Provide a link to included modules
+          if(include!==null) { //Provide a link to included modules
             const file = parserCollection.files[document.uri.toString()];
-            for(const inc of file.includes) {
-              if(position.line===inc.line) {
-                extraDocs = ` ([${path.basename(inc.uri)}](${inc.uri}))`;
-                break;
+            if (word !== 'include') {
+              let includeHover = `Unresolved include file "${include[1]}"`
+              for(const inc of file.includes) {
+                if(position.line===inc.line) {
+                  includeHover = `Include file ["${path.basename(inc.uri)}"](${inc.uri})`;
+                  break;
+                }
               }
+              const contents = new vscode.MarkdownString(includeHover);  
+              contents.isTrusted = true;
+              return new vscode.Hover(contents);
+            } else {
+              extraDocs = ` (unresolved file "${include[1]}")`
+              for(const inc of file.includes) {
+                if(position.line===inc.line) {
+                  extraDocs = ` ([${path.basename(inc.uri)}](${inc.uri}))`;
+                  break;
+                }
+              }  
             }
           }
           for(let concept of ['Programming','Commands','Element Information','Functions','Operators','General Information','Basic Workfile Functions','Dated Workfile Information','Panel Workfile Functions']) {
@@ -799,7 +909,7 @@ export function activate(context: vscode.ExtensionContext) {
               return new vscode.Hover(contents);
             }
           }
-          if(word.length>0) {
+          if(include===null && word.length>0) {
             return new vscode.Hover(`Unkown name ${wordAsTyped}`);
           }
       } 

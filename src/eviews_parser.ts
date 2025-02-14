@@ -14,6 +14,7 @@ export type Variable = {
     name: string,
     lookupName: string,
     line: number,
+    annotatedType: boolean;
 }
 
 export type CodeProblem = {
@@ -29,8 +30,8 @@ export type Symbol = {
 }
 
 
-function v(type:string, name:string, line:number):Variable {
-    return {type:type, name:name, lookupName:name.toUpperCase(), line:line};
+function v(type:string, name:string, line:number, annotatedType:boolean):Variable {
+    return {type:type, name:name, lookupName:name.toUpperCase(), line:line, annotatedType:annotatedType};
 }
 
 export class VariableArray extends Array<Variable> {
@@ -64,6 +65,7 @@ type DocString = {body:string, args:{[id:string]:string}};
 export class ParsedSub {
     // Container representing an EViews subroutines parsed for definitions and belonging to a file
     file: ParsedFile;
+    local: boolean;
     name: string;
     lookupName: string;
     start: number;
@@ -74,9 +76,10 @@ export class ParsedSub {
     args:VariableArray;
     docString:DocString;
 
-    constructor(file:ParsedFile, name:string, start:number ,end:number, args:VariableArray) {
+    constructor(file:ParsedFile, name:string, local:boolean, start:number ,end:number, args:VariableArray) {
         this.file = file;
         this.name = name;
+        this.local = local;
         this.lookupName = name.toUpperCase();
         this.start = start;
         this.end = end;
@@ -91,7 +94,7 @@ export class ParsedSub {
         while(i+1<this.end) {
             i++;
             let line = code_lines[i].trim();
-            const lsu = line.toUpperCase();
+            let lsu = line.toUpperCase();
             if(docStringScanning) {
                 if(lsu.startsWith("'")) {
                     const docLine = line.slice(1).trim();
@@ -107,14 +110,14 @@ export class ParsedSub {
                 }
             }
             if (lsu.startsWith('CALL')) {
-                const call = lsu.slice(4).split("(")[0].trim();
+                const call = lsu.slice(5).split("(")[0].trim();
                 if(!this.calls.includes(call)) {
                     this.calls.push(call);
                 }
                 continue
             }
             if (lsu.startsWith('COPY')) {
-                const parens = line.slice(4).match(/^(\(.*?\))?/)
+                const parens = line.slice(5).match(/^(\(.*?\))?/)
                 if(!parens) continue
                 line = line.slice(4+parens[0].length);
                 const srcVar = line.match(/^(?:\(.*\))?\s*((\{[%!][a-zA-Z_]\w*\}|[a-zA-Z_]\w*)+)/) //TODO: this will pick up objects defined by commands like vector(n) vecname{!i}_t
@@ -128,37 +131,58 @@ export class ParsedSub {
                 else continue;
                 const vname = destVar[1];
                 if(this.vars.has(vname) || this.args.has(vname)) continue;
-                this.vars.push(v(vtype, vname, i))
+                this.vars.push(v(vtype, vname, i, false));
                 continue;
             }
-            const match = line.match(/^([%!][a-zA-Z_]\w*)\s*=.*/);
+            let type = '';
+            if (lsu.startsWith("'@TYPE")) {
+                type = lsu.slice(7).trim(); //' \t'
+                if (!eviewsTypes.includes(type)) {
+                    let typePart = line.slice(7).trim();
+                    while(true) {
+                        const nextType = typePart.match(/^([%!]?(\{[%!][a-z_]\w*\}|[a-z_]\w*)+)\s*=>\s*(\w+)/i);
+                        if (nextType===null) break; //TODO: if typePart is non-empty, add a problem
+                        const varName = nextType[1];
+                        const varType = nextType[3].toUpperCase();
+                        if (eviewsTypes.includes(varType) && !this.vars.has(varName) && !this.args.has(varName)) { //TODO: report a problem is unknown eviewsType
+                            this.vars.push(v(varType, varName, i, true));
+                        }
+                        typePart = typePart.slice(nextType[0].length).trim();
+                    }
+                    continue;
+                }
+                i++;
+                line = code_lines[i].trim();
+                lsu = line.toUpperCase();
+            }
+            const match = line.match(/^([%!]?(\{[%!][a-zA-Z_]\w*\}|[a-zA-Z_]\w*)+)\s*=.*/);
             if (match) {
-                const vname = match[1];
-                if (!this.vars.has(vname) && !this.args.has(vname)) {
-                    const vtype = vname[0]=='%'? 'STRING': 'SCALAR';
-                    this.vars.push(v(vtype, vname, i));
+                const varName = match[1];
+                const varType = varName[0]=='%'? 'STRING': varName[0]=='!' ? 'SCALAR' : type;
+                if (varType!=='' && !this.vars.has(varName) && !this.args.has(varName)) {
+                    this.vars.push(v(varType, varName, i, type===varType));
                 }
                 continue
             }
             if(lsu.startsWith('FOR')) {
-                const match = line.slice(3).match(/([%!]?[a-zA-Z_]\w*)\s*=?/)
+                const match = line.slice(4).match(/([%!]?[a-zA-Z_]\w*)\s*=?/)
                 if(match) {
                     const type = match[1][0]==='%'? 'STRING':
                             match[1][0]==='!'? 'SCALAR':
                             match[0][match[0].length-1]==='='?'SCALAR':
                             'STRING';
                     if(!this.vars.has(match[1]) && !this.args.has(match[1])) {
-                        this.vars.push(v(type, match[1], i));
+                        this.vars.push(v(type, match[1], i, false));
                     }
                 }
                 continue
             }
             for(const objectName of eviewsTypes) {
                 if(lsu.startsWith(objectName)) {
-                    const match = line.slice(objectName.length).match(/^(?:\(.*\))?\s*((\{[%!][a-zA-Z_]\w*\}|[a-zA-Z_]\w*)+)/) //TODO: this will pick up objects defined by commands like vector(n) vecname{!i}_t
+                    const match = line.slice(objectName.length+1).match(/^(?:\(.*\))?\s*((\{[%!][a-zA-Z_]\w*\}|[a-zA-Z_]\w*)+)/) //TODO: this will pick up objects defined by commands like vector(n) vecname{!i}_t
                     if(match) {
                         if (!this.vars.has(match[1]) && !this.args.has(match[1])) {
-                            this.vars.push(v(objectName, match[1], i));
+                            this.vars.push(v(objectName, match[1], i, false));
                         }
                     }
                     continue
@@ -330,7 +354,7 @@ export class ParsedFile {
             let line = code[i].trim();
             let lsu = line.toUpperCase();
             if (lsu.startsWith('INCLUDE')) {
-                let include = line.slice(7).trim().replace('"','').replace('"',''); //'" \t'
+                let include = line.slice(8).trim().replace('"','').replace('"',''); //'" \t'
                 const res = path.resolve(path.dirname(this.file.fsPath), include);
                 // const resDisk = fs.realpathSync.native(res);
                 // const resFinal = path.resolve(path.dirname(this.file.fsPath), resDisk.slice(resDisk.length-include.length));
@@ -349,33 +373,60 @@ export class ParsedFile {
                 continue
             }
             if (lsu.startsWith('CALL')) {
-                let call = lsu.slice(4).split('(')[0].trim(); //' \t'
+                let call = lsu.slice(5).split('(')[0].trim(); //' \t'
                 if (!this.calls.includes(call)) {
                     this.calls.push(call);
                 }
                 continue
             }
-            let match = line.match(/^([%!][A-Z_]\w*)[ \t]*=.*/i);
+            let type = '';
+            if (lsu.startsWith("'@TYPE")) {
+                type = lsu.slice(7).trim(); //' \t'
+                if (!eviewsTypes.includes(type)) {
+                    let typePart = line.slice(7).trim();
+                    while(true) {
+                        const nextType = typePart.match(/^([%!]?(\{[%!][a-z_]\w*\}|[a-z_]\w*)+)\s*=>\s*(\w+)/i);
+                        if (nextType===null) break; //TODO: if typePart is non-empty, add a problem
+                        const varName = nextType[1];
+                        const varType = nextType[3].toUpperCase();
+                        if (eviewsTypes.includes(varType) && !this.vars.has(varName)) { //TODO: report a problem is unknown eviewsType
+                            this.vars.push(v(varType, varName, i, true));
+                        }
+                        typePart = typePart.slice(nextType[0].length).trim();
+                    }
+                    continue;
+                }
+                i++;
+                line = code[i].trim();
+                lsu = line.toUpperCase();
+            }
+            //Variable declaration (i.e., %varname = <expression>)
+            let match = line.match(/^([%!]?(\{[%!][a-zA-Z_]\w*\}|[a-zA-Z_]\w*)+)\s*=.*/);
             if (match) {
                 const varName = match[1];
-                const varType = varName[0]=='%'? 'STRING':'SCALAR';
-                if (!this.vars.has(varName)) {
-                    this.vars.push(v(varType, varName, i));
+                const varType = varName[0]=='%'? 'STRING': varName[0]=='!' ? 'SCALAR' : type;
+                if (varType!=='' && !this.vars.has(varName)) {
+                    this.vars.push(v(varType, varName, i, type===varType));
                 }
                 continue
             }
             if (lsu.startsWith('SUBROUTINE')) {
                 let sub:string, argPart:string;
                 let args:VariableArray = new VariableArray();
-                [sub, argPart] = line.slice(10).split('(', 2);
+                [sub, argPart] = line.slice(11).split('(', 2);
                 sub = sub.trim();
+                let local = false;
+                if(sub.toUpperCase().startsWith('LOCAL')) { //TODO: Local Subroutines are declared as "SUBROUTINE LOCAL subname(args)"
+                    sub = sub.slice(5).trim();
+                    local = true;
+                }
                 if(argPart!==undefined) {
                     const sargs = argPart.split(')',1)[0].split(','); //TODO: Error if no closing brace
                     for(let sarg of sargs) {
                         sarg = sarg.trim();
                         let argDef = sarg.match(/(\w+)\s([%!]?[A-Z_]\w*)/i);
                         if(argDef) {
-                            args.push(v(argDef[1], argDef[2], i)); //argDef[1] contains the type. Check it is a valid one
+                            args.push(v(argDef[1], argDef[2], i, false)); //argDef[1] contains the type. Check it is a valid one
                         } //track error if no match
                     }
                     if(args.length===0) {
@@ -386,14 +437,14 @@ export class ParsedFile {
                 while (j < code.length) {
                     let lline = code[j];
                     if (lline.trim().toUpperCase().startsWith('SUBROUTINE')) {
-                        this.problems.push({line:j, message:'ERROR: Illegal nested sub', var:v('SUB', sub, j)});
-                        let ps = new ParsedSub(this, sub, i, j, args);
+                        this.problems.push({line:j, message:'ERROR: Illegal nested sub', var:v('SUB', sub, j, false)});
+                        let ps = new ParsedSub(this, sub, local, i, j, args);
                         ps.parse(code);
                         this.subroutines.push(ps);
                         break;
                     }
                     if (lline.trim().toUpperCase().startsWith('ENDSUB')) {
-                        let ps = new ParsedSub(this, sub, i, j, args);
+                        let ps = new ParsedSub(this, sub, local, i, j, args);
                         ps.parse(code);
                         this.subroutines.push(ps);
                         break;
@@ -401,8 +452,8 @@ export class ParsedFile {
                     j++;
                 }
                 if (j === code.length) {
-                    this.problems.push({line:j, message:'ERROR: Missing endsub in file', var:v('SUB',sub, j)});
-                    let ps = new ParsedSub(this, sub, i, j, args);
+                    this.problems.push({line:j, message:'ERROR: Missing endsub in file', var:v('SUB',sub, j, false)});
+                    let ps = new ParsedSub(this, sub, local, i, j, args);
                     ps.parse(code);
                     this.subroutines.push(ps);
                 }
@@ -417,7 +468,7 @@ export class ParsedFile {
                             match[0][match[0].length-1]==='='?'SCALAR':
                             'STRING';
                     if(!this.vars.has(match[1])) {
-                        this.vars.push(v(type, match[1], i));
+                        this.vars.push(v(type, match[1], i, false));
                     }
                 }
                 continue
@@ -435,14 +486,14 @@ export class ParsedFile {
                 const vtype = this.vars.get(srcName)!.type;
                 const vname = destVar[1];
                 if(this.vars.has(vname)) continue;
-                this.vars.push(v(vtype, vname, i))
+                this.vars.push(v(vtype, vname, i, false))
                 continue;
             }
             for(const objectType of eviewsTypes) {
                 if(lsu.startsWith(objectType)) {
-                    const match = line.slice(objectType.length).match(/^(?:\(.*\))?\s*(([a-zA-Z_]\w*|\{[%!][a-zA-Z_]\w*\})+)/); //TODO: this will pick up commands like vector(n) vecname{!i}_t
+                    const match = line.slice(objectType.length+1).match(/^(?:\(.*\))?\s*(([a-zA-Z_]\w*|\{[%!][a-zA-Z_]\w*\})+)/); //TODO: this will pick up commands like vector(n) vecname{!i}_t
                     if(match && !this.vars.has(match[1])) {
-                        this.vars.push(v(objectType, match[1], i));
+                        this.vars.push(v(objectType, match[1], i, false));
                     }
                     continue
                 }

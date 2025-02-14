@@ -3,6 +3,9 @@
 	"name": "EViews Scripting Language",
 	"patterns": [
 		{
+			"include": "#commentDeclarations"
+		},
+		{
 			"include": "#comments"
 		},
 		{
@@ -31,9 +34,20 @@
 		},
 		{
 			"include": "#vars"
+		},
+		{
+			"include": "#commands-with-strings"
+		},
+		{
+			"include": "#commands"
 		}
 	],
 	"repository": {
+		"commentDeclarations": {
+			"begin": "(?i)\\'@type",
+			"end": "\\n",
+			"name": "keyword"
+		},
 		"comments": {
 			"begin": "\\'",
 			"end":"\\n",
@@ -49,12 +63,29 @@
 		},
 		"strings": {
 			"name": "string",
-			"begin": "\"",
-			"end": "\""
+			"match": "\"(\"\"|[^\"]*)\""
+		},
+		"commands-with-strings": {
+			"match": "^\\s*(logmsg)\\s+([^']*)",
+			"captures": {
+				"1": {
+					"name": "command"
+				},
+				"2": {
+					"name": "string"
+				}
+			}
 		},
 		"commands": {
-			"name": "command",
-			"match": "^\\s*(\\w+)(.*)$"
+			"match": "^\\s*(\\w+)\\s+([^']*)",
+			"captures": {
+				"1": {
+					"name": "command"
+				},
+				"2": {
+					"name": "command"
+				}
+			}
 		},
 		"scalars": {
 			"match":

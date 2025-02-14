@@ -52,9 +52,34 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
  - Copy cmd creates definitions
  - No "." operator hints on program vars
  
+### [0.2.7] -- 4/29/2024
+
+ - Hover provider prioritizes clashes between user symbols and EViews keywords appropriately
+ - Subroutine sig helper now correctly works alongside completion hints
+
+### [0.2.8] -- 1/3/2025
+
+ - Support "subroutine local" [DONE]
+ - Update for URL changes to EViews online help [DONE]
+ - Include hover over path will resolve clickable link to path (previously only if you hovered over the include keyword) [DONE]
+ - JSDOC-style docstring type definitions on the lines above referenced variables. 
+ 
+    Examples:
+
+    ```
+        '@type table
+        myTable(1,3) = @value("100")
+
+        '@type myTable=table a=scalar d=vector
+        a = d(3)
+
+    ```
+
  ### [0.3.0] - FUTURE PLANS
 
+ - Multiline support [?]
  - Errors/Problems [?]
  - Outline in Explorer View [?]
  - In-comment declarations to aid intellisense [?]
  - Completions on object element operations (e.g., comletions/sig help on myVec in "myVec(2) = 1" and "!c = myVec(2)") [?]
+ - Duplicate variable/subroutine defintions [?]

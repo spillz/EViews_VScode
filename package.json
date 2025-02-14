@@ -5,7 +5,7 @@
   "icon": "icon.png",
   "publisher": "dlmprod",
   "license": "MIT License",
-  "version": "0.2.6",
+  "version": "0.2.8",
   "engines": {
     "vscode": "^1.80.0"
   },
@@ -64,11 +64,11 @@
     "configuration": {
       "title": "Eviews Language Extension Configuration",
       "properties": {
-          "eviews-language-extension.eviews-path": {
-              "type": "string",
-              "default": "",
-              "description": "Full path to the EViews executable."
-          }
+        "eviews-language-extension.eviews-path": {
+          "type": "string",
+          "default": "",
+          "description": "Full path to the EViews executable."
+        }
       }
     }
   },
