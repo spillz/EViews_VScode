@@ -72,8 +72,11 @@ Adjust symbol resolution priority (EViews keywords vs user defined symbols).
 ### 0.2.8
 
 Support "subroutine local"
+
 Update for URL changes to EViews online help
+
 Include hover over path will resolve clickable link to path (previously only if you hovered over the include keyword)
+
 JSDOC-style docstring type definitions on the lines above referenced variables to improve completions. 
  
     Examples:
