@@ -4,11 +4,15 @@ A VS Code extension that adds programming language support for EViews, the suite
 
 ## Features
 
-Provides basic syntax highlighting, intellisense and hover for the EViews scripting language (.prg files).
+Provides basic syntax highlighting, code completion and hover hints for the EViews scripting language (.prg files).
 
 ## Requirements
 
 None required to use the extension although you will obviously need a copy of EViews to be able to run your programs.
+
+## Download the extension
+
+See [releases](https://github.com/spillz/EViews_VScode/releases) for the lateset build. Install the extension into an active VS code instance with `Ctrl+Shift+P => "Extensions: Install from VSIX..."`.
 
 ## Building the extension from source
 
