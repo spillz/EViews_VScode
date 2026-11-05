@@ -376,15 +376,16 @@ export function activate(context: vscode.ExtensionContext) {
     }
     const editor = vscode.window.activeTextEditor;
     if(!editor || editor.document.languageId!=='eviews-prg') return;
-    const eviewsExec = new vscode.ProcessExecution(eviewsPrg, [editor.document.uri.fsPath]);
+    const filePath = editor.document.uri.fsPath;
+    const eviewsExec = new vscode.ProcessExecution(eviewsPrg, [filePath]);
     const _task = new vscode.Task(
-      { type: 'eviewLaunchGroup' }, 
+      { type: 'eviewLaunchGroup', file: filePath },
       vscode.TaskScope.Global,
-      'eviews.launch.activeEditor', // Task name
-      'eviewsLaunchGroup', // Task source
-      eviewsExec // The ProcessExecution object
+      `Run in EViews: ${path.basename(filePath)}`,
+      'eviewsLaunchGroup',
+      eviewsExec
     );
-  vscode.tasks.executeTask(_task);
+    vscode.tasks.executeTask(_task);
   });
 
   context.subscriptions.push(disposable);
