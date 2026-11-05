@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
 import { time } from 'console';
+import { assignmentPattern, typeAnnotationPattern } from './eviews_identifiers';
 
 export var eviewsTypes = [
     'ALPHA', 'MODEL', 'SVECTOR', 'COEF', 'POOL', 'SYM', 'EQUATION', 'ROWVECTOR', 'SYSTEM', 
@@ -140,10 +141,10 @@ export class ParsedSub {
                 if (!eviewsTypes.includes(type)) {
                     let typePart = line.slice(7).trim();
                     while(true) {
-                        const nextType = typePart.match(/^([%!]?(\{[%!][a-z_]\w*\}|[a-z_]\w*)+)\s*=>\s*(\w+)/i);
+                        const nextType = typePart.match(typeAnnotationPattern);
                         if (nextType===null) break; //TODO: if typePart is non-empty, add a problem
                         const varName = nextType[1];
-                        const varType = nextType[3].toUpperCase();
+                        const varType = nextType[2].toUpperCase();
                         if (eviewsTypes.includes(varType) && !this.vars.has(varName) && !this.args.has(varName)) { //TODO: report a problem is unknown eviewsType
                             this.vars.push(v(varType, varName, i, true));
                         }
@@ -155,7 +156,7 @@ export class ParsedSub {
                 line = code_lines[i].trim();
                 lsu = line.toUpperCase();
             }
-            const match = line.match(/^([%!]?(\{[%!][a-zA-Z_]\w*\}|[a-zA-Z_]\w*)+)\s*=.*/);
+            const match = line.match(assignmentPattern);
             if (match) {
                 const varName = match[1];
                 const varType = varName[0]=='%'? 'STRING': varName[0]=='!' ? 'SCALAR' : type;
@@ -385,10 +386,10 @@ export class ParsedFile {
                 if (!eviewsTypes.includes(type)) {
                     let typePart = line.slice(7).trim();
                     while(true) {
-                        const nextType = typePart.match(/^([%!]?(\{[%!][a-z_]\w*\}|[a-z_]\w*)+)\s*=>\s*(\w+)/i);
+                        const nextType = typePart.match(typeAnnotationPattern);
                         if (nextType===null) break; //TODO: if typePart is non-empty, add a problem
                         const varName = nextType[1];
-                        const varType = nextType[3].toUpperCase();
+                        const varType = nextType[2].toUpperCase();
                         if (eviewsTypes.includes(varType) && !this.vars.has(varName)) { //TODO: report a problem is unknown eviewsType
                             this.vars.push(v(varType, varName, i, true));
                         }
@@ -401,7 +402,7 @@ export class ParsedFile {
                 lsu = line.toUpperCase();
             }
             //Variable declaration (i.e., %varname = <expression>)
-            let match = line.match(/^([%!]?(\{[%!][a-zA-Z_]\w*\}|[a-zA-Z_]\w*)+)\s*=.*/);
+            let match = line.match(assignmentPattern);
             if (match) {
                 const varName = match[1];
                 const varType = varName[0]=='%'? 'STRING': varName[0]=='!' ? 'SCALAR' : type;
