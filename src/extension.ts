@@ -406,6 +406,12 @@ export function activate(context: vscode.ExtensionContext) {
   }));
 
   context.subscriptions.push(vscode.workspace.onDidChangeTextDocument((event)=> {
+    if (
+      event.document.languageId !== 'eviews-prg'
+      || event.contentChanges.length === 0
+    ) {
+      return;
+    }
     // console.log('Changed',event.document.uri, event.contentChanges.length);
     parserCollection.push(event.document.uri.toString());
   }));
