@@ -43,7 +43,7 @@ const program_snippets:{[keyword:string]:Snip} = {
       "body": ["else"],
       "usage": "else",
       "description": "Else part of if statement."
-    },  
+    },
   },
   "endif": {
     "Endif": {
@@ -51,7 +51,7 @@ const program_snippets:{[keyword:string]:Snip} = {
       "body": ["endif"],
       "usage": "endif",
       "description": "End of if statement."
-    },  
+    },
   },
   "while": {
     "While": {
@@ -59,7 +59,7 @@ const program_snippets:{[keyword:string]:Snip} = {
       "body": ["while ${1:condition}", "\t$0", "wend"],
       "usage": "while <condition> ...",
       "description": "A while loop."
-    },  
+    },
   },
   "wend": {
     "Wend": {
@@ -67,7 +67,7 @@ const program_snippets:{[keyword:string]:Snip} = {
       "body": ["wend"],
       "usage": "wend",
       "description": "End of while loop."
-    },  
+    },
   },
   "subroutine": {
     "Subroutine": {
@@ -75,7 +75,7 @@ const program_snippets:{[keyword:string]:Snip} = {
       "body": ["subroutine ${1:sub_name}${2:(type1 arg1, type2 arg2, ...)}", "\t$0", "endsub"],
       "usage": "subroutine <sub_name>[(<arg1>, <arg2>, ...)] ...",
       "description": "Subroutine definition."
-    },  
+    },
   },
   "endsub": {
     "Subroutine": {
@@ -83,7 +83,7 @@ const program_snippets:{[keyword:string]:Snip} = {
       "body": ["endsub"],
       "usage": "endsub",
       "description": "Subroutine end."
-    },  
+    },
   },
   "call": {
     "Call": {
@@ -91,18 +91,18 @@ const program_snippets:{[keyword:string]:Snip} = {
       "body": ["call "], // ${1:sub_name}
       "usage": "call <sub_name>[(<arg1>, <arg2>, ...)]",
       "description": "A subroutine call."
-    }  
+    }
   },
   "type": {
     "Type Annotations: Multiple": {
       "prefix": "type#multiannotation",
-      "body": ["'@type ${1:varname1}=>${2:typename1} ${3:varname2=>typename2 ...}"], 
+      "body": ["'@type ${1:varname1}=>${2:typename1} ${3:varname2=>typename2 ...}"],
       "usage": "'@type <varname1>=><typename1> [<varname2>=><typename2> <varname3>=><typename3> ...]",
       "description": "Declares the types of one or more variables used in the program"
     },
     "Type Annotation: Next Line": {
       "prefix": "type#annotation",
-      "body": ["'@type ${1:typename}"], 
+      "body": ["'@type ${1:typename}"],
       "usage": "'@type <type_name>",
       "description": "Declares the type of the EViews object being assigned on the next line"
     }
@@ -111,7 +111,7 @@ const program_snippets:{[keyword:string]:Snip} = {
 
 type SigData = {
   call:string,
-  args:Array<{label:string, description?:string}>  
+  args:Array<{label:string, description?:string}>
   type:string,
 }
 
@@ -143,7 +143,7 @@ function getLineSigData(line:string): LineSigData|undefined {
     }
     i++;
   }
-  if(parenLoc.length===0) { //quoteLevel===1 || 
+  if(parenLoc.length===0) { //quoteLevel===1 ||
     return;
   }
   const result:LineSigData = {};
@@ -159,7 +159,7 @@ function getLineSigData(line:string): LineSigData|undefined {
     result.obj = objMatch[1];
   } else {
     const subMatch = line.slice(0, funcStart).match(/(call)\s+$/i)
-    if(subMatch) result.sub = subMatch[1];  
+    if(subMatch) result.sub = subMatch[1];
   }
   return result;
 }
@@ -251,7 +251,7 @@ function usageSnippets(usage:string, kw:string):Array<[string, vscode.SnippetStr
       }
     }
     snippets.push([use, new vscode.SnippetString(new_use)]);
-  }  
+  }
   return snippets;
 }
 
@@ -321,7 +321,7 @@ export function activate(context: vscode.ExtensionContext) {
   eviewsGroups['VS Code Extension'] = extGrpKW;
 
   let disposable;
-  
+
   disposable = vscode.commands.registerCommand('eviews.setEViewsPath', () => {
     if(process.platform!=='win32') {
       vscode.window.showErrorMessage('EViews launch only supported on Windows');
@@ -406,6 +406,12 @@ export function activate(context: vscode.ExtensionContext) {
   }));
 
   context.subscriptions.push(vscode.workspace.onDidChangeTextDocument((event)=> {
+    if (
+      event.document.languageId !== 'eviews-prg'
+      || event.contentChanges.length === 0
+    ) {
+      return;
+    }
     // console.log('Changed',event.document.uri, event.contentChanges.length);
     parserCollection.push(event.document.uri.toString());
   }));
@@ -421,7 +427,7 @@ export function activate(context: vscode.ExtensionContext) {
   const cprov = vscode.languages.registerCompletionItemProvider(
     'eviews-prg',
     {
-      provideCompletionItems(document: TextDocument, position: Position, token: CancellationToken, context: vscode.CompletionContext): 
+      provideCompletionItems(document: TextDocument, position: Position, token: CancellationToken, context: vscode.CompletionContext):
                     vscode.ProviderResult<vscode.CompletionItem[] | vscode.CompletionList<vscode.CompletionItem>> {
         const items:vscode.CompletionItem[] = [];
         let range = document.getWordRangeAtPosition(position, /((?<=')@\w*|(?<==>)\w*|[!%@]?(?:\{[%!][a-z_]\w*\}|[a-z_]\w*)(?:\{[%!][a-z_]\w*\}|\w*)*\.?|[!%@])/i);
@@ -444,7 +450,7 @@ export function activate(context: vscode.ExtensionContext) {
                               .match(/[!%@]?(?:\{[%!][a-zA-Z_]\w*\}|[a-zA-Z_]\w*)(?:\{[%!][a-zA-Z_]\w*\}|\w*)*=>$/i);
           subCallMatch = dottedMatch===null? //Subroutine call match should be non-null if cursor is after a "call " but before an opening parens "(" -- we will give hints for known subs if this is not null
                               document.getText(new vscode.Range(lineStart, range.start))
-                                      .match(/call\s+(?!\w+\()/i): 
+                                      .match(/call\s+(?!\w+\()/i):
                               null;
         } else {
           range = new vscode.Range(position, position);
@@ -454,7 +460,7 @@ export function activate(context: vscode.ExtensionContext) {
           arrowMatch = null;
           word = '';
         }
-        const prefixPos = new vscode.Position(lineStart.line, 
+        const prefixPos = new vscode.Position(lineStart.line,
                     (dottedMatch!==null? range.start.character - dottedMatch[0].length:
                     subCallMatch!==null? subCallMatch.index! + subCallMatch[0].length:
                     range.start.character)
@@ -510,7 +516,7 @@ export function activate(context: vscode.ExtensionContext) {
               ci.range = range;
               items.push(ci);
             }
-          }  
+          }
           return items;
         }
         if (word[0]!=="'" && line.trim()[0]!=="'") {
@@ -541,7 +547,7 @@ export function activate(context: vscode.ExtensionContext) {
                       ci.detail = eviewsGroups[capType][meth]['usage'].split('\n').join(' | ');
                       ci.range = range;
                       ci.preselect = true;
-                      items.push(ci);          
+                      items.push(ci);
                     } else { //object commands
                       const usage = eviewsGroups[capType][meth]['usage'];
                       for(const use of usageSnippets(usage, meth)) {
@@ -552,10 +558,10 @@ export function activate(context: vscode.ExtensionContext) {
                           ci.detail = use[0];
                           ci.range = range;
                           ci.insertText = use[1];
-                          ci.preselect = true;  
-                          items.push(ci);            
+                          ci.preselect = true;
+                          items.push(ci);
                         }
-                      }  
+                      }
                     }
                   }
                 }
@@ -580,7 +586,7 @@ export function activate(context: vscode.ExtensionContext) {
                       ci.documentation = new vscode.MarkdownString(snipData['description']+`\n\nEviews help: [${kw}](${docUri(info)})`);
                       ci.documentation.isTrusted = true;
                       ci.detail = snipData['usage'] //eviewsGroups[concept][kw]['usage'].split('\n').join(' | ');
-                      ci.range = range;  
+                      ci.range = range;
                       ci.insertText = new vscode.SnippetString(snipData['body'].join('\n'));
                       items.push(ci);
                     }
@@ -593,11 +599,11 @@ export function activate(context: vscode.ExtensionContext) {
                       ci.detail = use[0] //eviewsGroups[concept][kw]['usage'].split('\n').join(' | ');
                       ci.range = range;
                       ci.insertText = use[1];
-                      items.push(ci);    
-                    }  
+                      items.push(ci);
+                    }
                   }
                 }
-              }  
+              }
             }
             if(subCallMatch===null) {
               //Functions -- we'll show anywhere except after a call statement
@@ -655,7 +661,7 @@ export function activate(context: vscode.ExtensionContext) {
                   ci.range = range;
                   items.push(ci);
                 }
-              }  
+              }
             }
           }
         }
@@ -664,7 +670,7 @@ export function activate(context: vscode.ExtensionContext) {
       resolveCompletionItem(item: vscode.CompletionItem, token: CancellationToken): vscode.ProviderResult<vscode.CompletionItem> {
         return item;
       }
-    }, 
+    },
     '@',
     '.',
     '%',
@@ -696,7 +702,7 @@ export function activate(context: vscode.ExtensionContext) {
         if(lineSigData.sub) { //subroutine call
           const symbol = file.getSymbol(parserCollection, callName, position.line, true, true);
           if(symbol!==undefined && symbol.object instanceof ev.ParsedSub) {
-            const sigData = subSigData(symbol.object);  
+            const sigData = subSigData(symbol.object);
             const sig = new vscode.SignatureInformation(sigData.call, `${sigData.type} ${symbol.object.name}`);
             for(const arg of sigData.args) {
               sig.parameters.push(new vscode.ParameterInformation(arg.label, arg.description));
@@ -718,7 +724,7 @@ export function activate(context: vscode.ExtensionContext) {
                 if(callName in eviewsGroups[capType]) {
                   callData = eviewsGroups[capType][callName];
                 }
-              }  
+              }
             }
           }
         }
@@ -727,7 +733,7 @@ export function activate(context: vscode.ExtensionContext) {
             if(callName in eviewsGroups[concept]) {
               callData = eviewsGroups[concept][callName];
               break;
-            }   
+            }
           }
         }
         if(callData===undefined) return;
@@ -749,7 +755,7 @@ export function activate(context: vscode.ExtensionContext) {
               }
             }
             signatureHelp.signatures.push(sig);
-          }  
+          }
         }
         else if(sigString.split('\n').length==1) {
           const sig = new vscode.SignatureInformation(sigString, callData.description)
@@ -758,10 +764,10 @@ export function activate(context: vscode.ExtensionContext) {
             for(let arg of argMatch[0].split(',')) {
               arg = arg.replace('[','').replace(']','').trim();
               sig.parameters.push(new vscode.ParameterInformation(arg.trim()))
-            }  
+            }
           }
           signatureHelp.signatures.push(sig);
-        } 
+        }
         else { //TODO: Other types of usage completions won't always fit this pattern of one variant per line
           const sigs = sigString.split('\n');
           for(const s of sigs) {
@@ -772,8 +778,8 @@ export function activate(context: vscode.ExtensionContext) {
                 arg = arg.replace('[','').replace(']','').trim();
                 sig.parameters.push(new vscode.ParameterInformation(arg.trim()));
               }
-            }  
-            signatureHelp.signatures.push(sig);  
+            }
+            signatureHelp.signatures.push(sig);
           }
         }
         return signatureHelp;
@@ -788,14 +794,14 @@ export function activate(context: vscode.ExtensionContext) {
         document: vscode.TextDocument, position: vscode.Position, token: vscode.CancellationToken): vscode.ProviderResult<vscode.Hover> {
         let range = document.getWordRangeAtPosition(position, /[!%@]?(?:\{[%!][a-zA-Z_]\w*\}|[a-zA-Z_]\w*)(?:\{[%!][a-zA-Z_]\w*\}|\w*)*/i);
         if(range!==undefined) {
-          const wordAsTyped = document.getText(range); 
+          const wordAsTyped = document.getText(range);
           const word = wordAsTyped.toLowerCase();
           const lineStart = new vscode.Position(range.start.line,0);
           const line = document.lineAt(range.start.line).text;
           const include = line.match(/include\s+["](.*)["]/i);
           const dottedMatch = document.getText(new vscode.Range(lineStart, range.start))
                               .match(/[!%@]?(?:\{[%!][a-zA-Z_]\w*\}|[a-zA-Z_]\w*)(?:\{[%!][a-zA-Z_]\w*\}|\w*)*\.$/i);
-          if(include===null) { 
+          if(include===null) {
             if (word.length>0 && dottedMatch) { //Trigger for method info hover is two adjoining words separated by a . -- todo: don't hover if the word to the left starts with @
               let obj = dottedMatch[0]; //Extract the parent object name
               obj = obj.slice(0,obj.length-1);//.toLowerCase();
@@ -821,7 +827,7 @@ export function activate(context: vscode.ExtensionContext) {
                       contents.isTrusted = true;
                       return new vscode.Hover(contents);
                     }
-                  }  
+                  }
                 }
               }
               return new vscode.Hover(new vscode.MarkdownString(`Unknown method of unknown object ${obj}`));
@@ -844,10 +850,10 @@ export function activate(context: vscode.ExtensionContext) {
                       `\n\nDefined in [${path.basename(symbol.file.fsPath)}:${symbol.object.start+1}](${symbol.file.toString()}#L${symbol.object.start+1})`;
                     const sigData = subSigData(symbol.object);
                     const docString = subDocString(symbol.object);
-                    const contents = new vscode.MarkdownString(`${sigData.type} ${sigData.call} (${scope})${fileInfo}\n\n${docString}\n\n---\n\n${capType}: ${desc}\n\nEviews help: [${capType}](${docUri(info)})`);  
+                    const contents = new vscode.MarkdownString(`${sigData.type} ${sigData.call} (${scope})${fileInfo}\n\n${docString}\n\n---\n\n${capType}: ${desc}\n\nEviews help: [${capType}](${docUri(info)})`);
                     contents.isTrusted = true;
                     return new vscode.Hover(contents);
-                  }  
+                  }
                 }
               }
               else if(symbol.object instanceof String || typeof(symbol.object)==='string') {
@@ -857,7 +863,7 @@ export function activate(context: vscode.ExtensionContext) {
                 const line = document.getText(new vscode.Range(lineStart,range.start)).trim().toUpperCase();
                 const lineEnd = document.getText(new vscode.Range(range.end, document.lineAt(range.end.line).range.end)).trim().toUpperCase();
                 //show user defined symbols for program vars, words after the first on the line, dot operations, or assignments (with optional params)
-                if(word[0]==='%'||word[0]==='!'||line.match(/^[!%]?[A-Za-z]/)||lineEnd.match(/^(:?\(.*?\))?(\.|\s*=)/)) { 
+                if(word[0]==='%'||word[0]==='!'||line.match(/^[!%]?[A-Za-z]/)||lineEnd.match(/^(:?\(.*?\))?(\.|\s*=)/)) {
                   const name = symbol.object.name;
                   const type = symbol.object.type.toLowerCase();
                   const scope = symbol.scope;
@@ -869,10 +875,10 @@ export function activate(context: vscode.ExtensionContext) {
                     const by = symbol.object.annotatedType ? ' by annotation':'';
                     const fileInfo = file.file.toString()===symbol.file.toString()? `\n\nFirst defined${by} on [line ${symbol.object.line+1}](${symbol.file.toString()}#L${symbol.object.line+1})`:
                       `\n\nFirst defined in [${path.basename(symbol.file.fsPath)}:${symbol.object.line+1}](${symbol.file.toString()}#L${symbol.object.line+1})`;
-                    const contents = new vscode.MarkdownString(`${capType} ${symbol.object.name} (${scope})${fileInfo}\n\n${desc}\n\nEviews help: [${capType}](${docUri(info)})`);  
+                    const contents = new vscode.MarkdownString(`${capType} ${symbol.object.name} (${scope})${fileInfo}\n\n${desc}\n\nEviews help: [${capType}](${docUri(info)})`);
                     contents.isTrusted = true;
                     return new vscode.Hover(contents);
-                  }  
+                  }
                 }
               }
             }
@@ -888,7 +894,7 @@ export function activate(context: vscode.ExtensionContext) {
                   break;
                 }
               }
-              const contents = new vscode.MarkdownString(includeHover);  
+              const contents = new vscode.MarkdownString(includeHover);
               contents.isTrusted = true;
               return new vscode.Hover(contents);
             } else {
@@ -898,14 +904,14 @@ export function activate(context: vscode.ExtensionContext) {
                   extraDocs = ` ([${path.basename(inc.uri)}](${inc.uri}))`;
                   break;
                 }
-              }  
+              }
             }
           }
           for(let concept of ['Programming','Commands','Element Information','Functions','Operators','General Information','Basic Workfile Functions','Dated Workfile Information','Panel Workfile Functions']) {
             if(word in eviewsGroups[concept]) {
               const info = eviewsGroups[concept][word];
               const desc = info.longDescription? info.description+'\n\n'+info.longDescription : info.description;
-              const contents = new vscode.MarkdownString(`${concept}: ${word}${extraDocs}\n\nUsage: ${info.usage}\n\n${desc}\n\nEviews help: [${word}](${docUri(info)})`);  
+              const contents = new vscode.MarkdownString(`${concept}: ${word}${extraDocs}\n\nUsage: ${info.usage}\n\n${desc}\n\nEviews help: [${word}](${docUri(info)})`);
               contents.isTrusted = true;
               return new vscode.Hover(contents);
             }
@@ -913,7 +919,7 @@ export function activate(context: vscode.ExtensionContext) {
           if(include===null && word.length>0) {
             return new vscode.Hover(`Unkown name ${wordAsTyped}`);
           }
-      } 
+      }
         // else {
         // // To enable command URIs in Markdown content, you must set the `isTrusted` flag.
         // // When creating trusted Markdown string, make sure to properly sanitize all the
@@ -922,7 +928,7 @@ export function activate(context: vscode.ExtensionContext) {
         //   const contents = new vscode.MarkdownString(`[Add comment](${commentCommandUri})`);
         //   contents.isTrusted = true;
         //   console.log(`EVIews Lang hover: ${contents}`);
-  
+
         //   return new vscode.Hover(contents);
 
         // }
