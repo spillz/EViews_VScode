@@ -385,15 +385,17 @@ export function activate(context: vscode.ExtensionContext) {
       vscode.window.showWarningMessage(message);
       return;
     }
-    const eviewsExec = new vscode.ProcessExecution(eviewsPrg, [program.filePath]);
+
+    const filePath = program.filePath;
+    const eviewsExec = new vscode.ProcessExecution(eviewsPrg, [filePath]);
     const _task = new vscode.Task(
-      { type: 'eviewLaunchGroup' }, 
+      { type: 'eviewLaunchGroup', file: filePath },
       vscode.TaskScope.Global,
-      'eviews.launch.activeEditor', // Task name
-      'eviewsLaunchGroup', // Task source
-      eviewsExec // The ProcessExecution object
+      `Run in EViews: ${path.basename(filePath)}`,
+      'eviewsLaunchGroup',
+      eviewsExec
     );
-  vscode.tasks.executeTask(_task);
+    vscode.tasks.executeTask(_task);
   });
 
   context.subscriptions.push(disposable);
