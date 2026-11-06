@@ -3,6 +3,7 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as ev from './eviews_parser';
+import { prepareProgramForRun } from './eviews_run';
 
 type Snip = {
   [id:string]: {prefix:string, body:string[], usage:string, description:string}
@@ -349,7 +350,7 @@ export function activate(context: vscode.ExtensionContext) {
   });
 
 
-  disposable = vscode.commands.registerCommand('eviews.runEViews', () => {
+  disposable = vscode.commands.registerCommand('eviews.runEViews', async () => {
     let eviewsPrg:string = vscode.workspace.getConfiguration('eviews-language-extension').get('eviews-path')!;
     if(!eviewsPrg) {
       if(process.platform!=='win32') {
@@ -376,7 +377,15 @@ export function activate(context: vscode.ExtensionContext) {
     }
     const editor = vscode.window.activeTextEditor;
     if(!editor || editor.document.languageId!=='eviews-prg') return;
-    const eviewsExec = new vscode.ProcessExecution(eviewsPrg, [editor.document.uri.fsPath]);
+    const program = await prepareProgramForRun(editor.document);
+    if (!program.ready) {
+      const message = program.reason === 'not-file'
+        ? 'Save the EViews program to a file before running it.'
+        : 'Could not save the EViews program. Run cancelled.';
+      vscode.window.showWarningMessage(message);
+      return;
+    }
+    const eviewsExec = new vscode.ProcessExecution(eviewsPrg, [program.filePath]);
     const _task = new vscode.Task(
       { type: 'eviewLaunchGroup' }, 
       vscode.TaskScope.Global,
