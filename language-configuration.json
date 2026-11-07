@@ -9,7 +9,8 @@
         ["{", "}"],
         ["if", "endif"],
         ["while", "wend"],
-        ["for", "next"]
+        ["for", "next"],
+        ["subroutine", "endsub"]
     ],
     // symbols that are auto closed when typing
     "autoClosingPairs": [

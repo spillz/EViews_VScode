@@ -4,6 +4,10 @@ import * as path from 'path';
 import * as fs from 'fs';
 import * as ev from './eviews_parser';
 import { buildUsageSnippetBodies } from './usage_snippets';
+import {
+  completionWordPattern, dottedReferencePattern, hoverWordPattern,
+  signatureObjectPattern, typeArrowReferencePattern
+} from './eviews_identifier_patterns';
 
 type Snip = {
   [id:string]: {prefix:string, body:string[], usage:string, description:string}
@@ -155,7 +159,9 @@ function getLineSigData(line:string): LineSigData|undefined {
   result.argPart = line.slice(argStart);
   result.argPos = getParamLoc(result.argPart);
   const funcStart = argStart-result.funcPart.length
-  const objMatch = line.slice(0, funcStart).match(/([%!]?(?:[A-Z]\w*|\{[%!][A-Z]\w*\})+)\.$/i)
+  const objectPrefix = line.slice(0, funcStart);
+  const objMatch = objectPrefix.endsWith('.')
+    ? objectPrefix.match(signatureObjectPattern) : null;
   if(objMatch) {
     result.obj = objMatch[1];
   } else {
@@ -347,15 +353,16 @@ export function activate(context: vscode.ExtensionContext) {
     }
     const editor = vscode.window.activeTextEditor;
     if(!editor || editor.document.languageId!=='eviews-prg') return;
-    const eviewsExec = new vscode.ProcessExecution(eviewsPrg, [editor.document.uri.fsPath]);
+    const filePath = editor.document.uri.fsPath;
+    const eviewsExec = new vscode.ProcessExecution(eviewsPrg, [filePath]);
     const _task = new vscode.Task(
-      { type: 'eviewLaunchGroup' }, 
+      { type: 'eviewLaunchGroup', file: filePath },
       vscode.TaskScope.Global,
-      'eviews.launch.activeEditor', // Task name
-      'eviewsLaunchGroup', // Task source
-      eviewsExec // The ProcessExecution object
+      `Run in EViews: ${path.basename(filePath)}`,
+      'eviewsLaunchGroup',
+      eviewsExec
     );
-  vscode.tasks.executeTask(_task);
+    vscode.tasks.executeTask(_task);
   });
 
   context.subscriptions.push(disposable);
@@ -376,6 +383,12 @@ export function activate(context: vscode.ExtensionContext) {
   }));
 
   context.subscriptions.push(vscode.workspace.onDidChangeTextDocument((event)=> {
+    if (
+      event.document.languageId !== 'eviews-prg'
+      || event.contentChanges.length === 0
+    ) {
+      return;
+    }
     // console.log('Changed',event.document.uri, event.contentChanges.length);
     parserCollection.push(event.document.uri.toString());
   }));
@@ -394,7 +407,7 @@ export function activate(context: vscode.ExtensionContext) {
       provideCompletionItems(document: TextDocument, position: Position, token: CancellationToken, context: vscode.CompletionContext): 
                     vscode.ProviderResult<vscode.CompletionItem[] | vscode.CompletionList<vscode.CompletionItem>> {
         const items:vscode.CompletionItem[] = [];
-        let range = document.getWordRangeAtPosition(position, /((?<=')@\w*|(?<==>)\w*|[!%@]?(?:\{[%!][a-z_]\w*\}|[a-z_]\w*)(?:\{[%!][a-z_]\w*\}|\w*)*\.?|[!%@])/i);
+        let range = document.getWordRangeAtPosition(position, completionWordPattern);
         const file = parserCollection.files[document.uri.toString()];
         const lineStart = new vscode.Position(position.line,0);
         const line = document.lineAt(lineStart).text;
@@ -408,10 +421,11 @@ export function activate(context: vscode.ExtensionContext) {
           if(range.start.character>0) {
             commentAnnotation = document.getText(new vscode.Range(new vscode.Position(range.start.line, range.start.character-1), range.start))==="'";
           }
-          dottedMatch = document.getText(new vscode.Range(lineStart, range.start))
-                              .match(/[!%@]?(?:\{[%!][a-zA-Z_]\w*\}|[a-zA-Z_]\w*)(?:\{[%!][a-zA-Z_]\w*\}|\w*)*\.$/i);
-          arrowMatch = document.getText(new vscode.Range(lineStart, range.start))
-                              .match(/[!%@]?(?:\{[%!][a-zA-Z_]\w*\}|[a-zA-Z_]\w*)(?:\{[%!][a-zA-Z_]\w*\}|\w*)*=>$/i);
+          const referencePrefix = document.getText(new vscode.Range(lineStart, range.start));
+          dottedMatch = referencePrefix.endsWith('.')
+            ? referencePrefix.match(dottedReferencePattern) : null;
+          arrowMatch = referencePrefix.endsWith('=>')
+            ? referencePrefix.match(typeArrowReferencePattern) : null;
           subCallMatch = dottedMatch===null? //Subroutine call match should be non-null if cursor is after a "call " but before an opening parens "(" -- we will give hints for known subs if this is not null
                               document.getText(new vscode.Range(lineStart, range.start))
                                       .match(/call\s+(?!\w+\()/i): 
@@ -756,15 +770,16 @@ export function activate(context: vscode.ExtensionContext) {
     {
       provideHover(
         document: vscode.TextDocument, position: vscode.Position, token: vscode.CancellationToken): vscode.ProviderResult<vscode.Hover> {
-        let range = document.getWordRangeAtPosition(position, /[!%@]?(?:\{[%!][a-zA-Z_]\w*\}|[a-zA-Z_]\w*)(?:\{[%!][a-zA-Z_]\w*\}|\w*)*/i);
+        let range = document.getWordRangeAtPosition(position, hoverWordPattern);
         if(range!==undefined) {
           const wordAsTyped = document.getText(range); 
           const word = wordAsTyped.toLowerCase();
           const lineStart = new vscode.Position(range.start.line,0);
           const line = document.lineAt(range.start.line).text;
           const include = line.match(/include\s+["](.*)["]/i);
-          const dottedMatch = document.getText(new vscode.Range(lineStart, range.start))
-                              .match(/[!%@]?(?:\{[%!][a-zA-Z_]\w*\}|[a-zA-Z_]\w*)(?:\{[%!][a-zA-Z_]\w*\}|\w*)*\.$/i);
+          const referencePrefix = document.getText(new vscode.Range(lineStart, range.start));
+          const dottedMatch = referencePrefix.endsWith('.')
+            ? referencePrefix.match(dottedReferencePattern) : null;
           if(include===null) { 
             if (word.length>0 && dottedMatch) { //Trigger for method info hover is two adjoining words separated by a . -- todo: don't hover if the word to the left starts with @
               let obj = dottedMatch[0]; //Extract the parent object name
