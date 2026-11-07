@@ -1,5 +1,5 @@
 /**
- * The EViews process executes a program from disk. Prepare that program before
+ * The EViews process executes a program from disk. This helper prepares it before
  * launching so that EViews sees the same contents as the VS Code editor.
  */
 export type ProgramDocument = {

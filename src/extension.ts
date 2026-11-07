@@ -3,7 +3,7 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as ev from './eviews_parser';
-import { prepareProgramForRun } from './eviews_run';
+import { prepareProgramForRun } from './eviews_run_prep';
 import {
   completionWordPattern, dottedReferencePattern, hoverWordPattern,
   signatureObjectPattern, typeArrowReferencePattern

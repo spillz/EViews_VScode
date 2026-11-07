@@ -1,7 +1,7 @@
 'use strict';
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
-const { prepareProgramForRun } = require('../out/eviews_run');
+const { prepareProgramForRun } = require('../out/eviews_run_prep');
 
 const programPath = 'C:\\models\\model.prg';
 
