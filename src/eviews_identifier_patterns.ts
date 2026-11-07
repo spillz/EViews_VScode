@@ -1,5 +1,5 @@
 /**
- * EViews names may contain expandable placeholders such as foo{%bar}baz.
+ * EViews identifier names may contain expandable placeholders such as foo{%bar}baz.
  *
  * Keep repetitions unambiguous: an expression such as
  * ([A-Za-z_]\w*)+ can backtrack exponentially when no '=' follows a

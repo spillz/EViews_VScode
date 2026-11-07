@@ -6,7 +6,7 @@ import * as ev from './eviews_parser';
 import {
   completionWordPattern, dottedReferencePattern, hoverWordPattern,
   signatureObjectPattern, typeArrowReferencePattern
-} from './eviews_identifiers';
+} from './eviews_identifier_patterns';
 
 type Snip = {
   [id:string]: {prefix:string, body:string[], usage:string, description:string}

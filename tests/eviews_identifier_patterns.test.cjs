@@ -2,7 +2,7 @@
 const assert = require('node:assert/strict');
 const { spawnSync } = require('node:child_process');
 const { test } = require('node:test');
-const { assignmentPattern, typeAnnotationPattern } = require('../out/eviews_identifiers');
+const { assignmentPattern, typeAnnotationPattern } = require('../out/eviews_identifier_patterns');
 
 test('matches assignments while preserving names and placeholders', () => {
     const names = [
@@ -24,7 +24,7 @@ test('matches type annotations and captures the type in group 2', () => {
 
 test('long non-assignments do not cause catastrophic backtracking', () => {
     // Run in a child: a regression must fail quickly instead of hanging tests.
-    const modulePath = require.resolve('../out/eviews_identifiers');
+    const modulePath = require.resolve('../out/eviews_identifier_patterns');
     const code = `
         const { assignmentPattern, typeAnnotationPattern } = require(${JSON.stringify(modulePath)});
         const name = 'very_long_name_without_an_equals_sign_or_type_annotation';

@@ -6,7 +6,7 @@ const { test } = require('node:test');
 const {
     completionWordPattern, dottedReferencePattern, hoverWordPattern,
     signatureObjectPattern, typeArrowReferencePattern
-} = require('../out/eviews_identifiers');
+} = require('../out/eviews_identifier_patterns');
 
 test('signature help extracts the object preceding a method', () => {
     for (const name of ['series', 'foo{%suffix}', '{%prefix}x', '{%prefix}2', 'foo{!i}{%j}']) {
@@ -38,7 +38,7 @@ test('word ranges preserve EViews identifiers and substitutions', () => {
 
 test('long identifiers without dot/arrow cannot block the extension host', () => {
     // Timeout protects the test suite if a future change restores the old regex.
-    const modulePath = require.resolve('../out/eviews_identifiers');
+    const modulePath = require.resolve('../out/eviews_identifier_patterns');
     const code = `
         const {
           signatureObjectPattern, dottedReferencePattern,

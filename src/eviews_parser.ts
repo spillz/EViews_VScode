@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
 import { time } from 'console';
-import { assignmentPattern, typeAnnotationPattern } from './eviews_identifiers';
+import { assignmentPattern, typeAnnotationPattern } from './eviews_identifier_patterns';
 
 export var eviewsTypes = [
     'ALPHA', 'MODEL', 'SVECTOR', 'COEF', 'POOL', 'SYM', 'EQUATION', 'ROWVECTOR', 'SYSTEM', 
