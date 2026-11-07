@@ -93,3 +93,11 @@ JSDOC-style docstring type definitions on the lines above referenced variables t
         a = d(3)
 
     ```
+
+### 0.2.9
+
+Improved parser and language-provider responsiveness for long identifiers.
+
+Fixed **Run in EViews** so it launches the active program and saves modified programs before running.
+
+Fixed dynamic usage snippets, reduced unnecessary document parsing, and improved subroutine brace matching.

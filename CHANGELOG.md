@@ -75,6 +75,14 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
     ```
 
+### [0.2.9] -- 11/7/2026
+
+ - Prevent parser, completion, signature-help, and hover hangs on long EViews identifiers
+ - Ensure **Run in EViews** launches the active program and saves modified programs before running
+ - Fix dynamic usage snippet generation
+ - Avoid unnecessary parsing for non-EViews documents and document events without text changes
+ - Improve brace matching for `subroutine` and `endsub`
+
  ### [0.3.0] - FUTURE PLANS
 
  - Multiline support [?]
