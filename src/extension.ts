@@ -3,6 +3,7 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as ev from './eviews_parser';
+import { buildUsageSnippetBodies } from './usage_snippets';
 import {
   completionWordPattern, dottedReferencePattern, hoverWordPattern,
   signatureObjectPattern, typeArrowReferencePattern
@@ -226,41 +227,11 @@ function subDocString(sub:ev.ParsedSub):string {
 
 
 function usageSnippets(usage:string, kw:string):Array<[string, vscode.SnippetString]> {
-  const snippets:Array<[string, vscode.SnippetString]> = [];
-  for(let use of usage.split('\n')) {
-    const k = use.indexOf(kw);
-    if(k===undefined) continue
-    let options = use.slice(k+kw.length);
-    let new_use = use.slice(0,k+kw.length);
-    let i = 0;
-    while(true) {
-      ++i;
-      let match = options.match(/^(\s*\(\s*options\s*\))/i); //single parens enclosed option e.g., "command(options)" -- select outside the parens
-      if(match) {
-        options = options.slice(match[0].length);
-        new_use = new_use+'${'+String(i)+':'+match[0]+'}';
-        continue
-      }
-      match = options.match(/^(\s*)\((.*?)\)/i) //all other options in parens -- create a group inside the parens (i.e., assumed not optional)
-      if(match) {
-        options = options.slice(match[0].length);
-        new_use = new_use+match[1]+'(${'+String(i)+':'+match[2]+'})';
-        continue
-      }
-      match = options.match(/^(\s+[^\s^[^\],]+|\s+\[.*?\])/); //all other command line args are outside of params but can be optional denoted by enclosed square brackets
-      if(!match || match[0].length===0) break;
-      options = options.slice(match[0].length);
-      if(match[1][0]=='@') {
-        new_use = new_use+match[0]; //@keywords are assumed to be required part of the command unless enclosed in [ ]
-      } else {
-        new_use = new_use+'${'+String(i)+':'+match[1]+'}'; //other command parts to be filled out including optional bits enclosed in []
-      }
-    }
-    snippets.push([use, new vscode.SnippetString(new_use)]);
-  }  
-  return snippets;
+  return buildUsageSnippetBodies(usage, kw).map(
+    ([label, body]): [string, vscode.SnippetString] =>
+      [label, new vscode.SnippetString(body)]
+  );
 }
-
 
 type KeywordInfo = {
   usage: string,
