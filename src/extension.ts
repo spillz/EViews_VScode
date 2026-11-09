@@ -298,84 +298,92 @@ export function activate(context: vscode.ExtensionContext) {
   }
   eviewsGroups['VS Code Extension'] = extGrpKW;
 
-  let disposable;
-  
-  disposable = vscode.commands.registerCommand('eviews.setEViewsPath', () => {
-    if(process.platform!=='win32') {
-      vscode.window.showErrorMessage('EViews launch only supported on Windows');
-      return;
-    }
-    let defaultPath:string = vscode.workspace.getConfiguration('eviews-language-extension').get('eviews-path')!;
-    if(!defaultPath) {
-      defaultPath = 'C:\\Program Files (x86)\\';
-    }
-    const files = vscode.window.showOpenDialog({
+  // VS Code configuration writes and task launches are asynchronous. Complete each
+  // operation before proceeding so that failures are reported to the user.
+  function errorMessage(error: unknown): string {
+    return error instanceof Error ? error.message : String(error);
+  }
+
+  async function selectEViewsExecutable(defaultPath: string): Promise<string | undefined> {
+    const uris = await vscode.window.showOpenDialog({
       canSelectMany: false,
       openLabel: 'Select the EViews executable',
       defaultUri: vscode.Uri.file(defaultPath),
-      filters: {
-        'Eviews exectuable': ['exe']
-      }
-    }).then((uris) => {
-      if(uris && uris.length==1) {
-        const uri = uris[0];
-        if(path.extname(uri.fsPath)==='.exe') {
-          vscode.workspace.getConfiguration('eviews-language-extension').update('eviews-path', uri.fsPath);
-        }
-      }
+      filters: { 'EViews executable': ['exe'] }
     });
+    if (!uris || uris.length === 0) return;
+
+    const selectedPath = uris[0].fsPath;
+    if (path.extname(selectedPath).toLowerCase() !== '.exe') {
+      vscode.window.showErrorMessage('Please select an EViews executable (.exe).');
+      return;
+    }
+    return selectedPath;
+  }
+
+  const setEViewsPath = vscode.commands.registerCommand('eviews.setEViewsPath', async () => {
+    if (process.platform !== 'win32') {
+      vscode.window.showErrorMessage('EViews launch only supported on Windows');
+      return;
+    }
+
+    const config = vscode.workspace.getConfiguration('eviews-language-extension');
+    const currentPath = config.get<string>('eviews-path');
+    try {
+      const selectedPath = await selectEViewsExecutable(
+        currentPath || 'C:\\Program Files (x86)\\'
+      );
+      if (!selectedPath) return;
+      await config.update('eviews-path', selectedPath);
+    } catch (error) {
+      vscode.window.showErrorMessage(
+        `Could not set the EViews executable path: ${errorMessage(error)}`
+      );
+    }
   });
 
+  const runEViews = vscode.commands.registerCommand('eviews.runEViews', async () => {
+    const editor = vscode.window.activeTextEditor;
+    if (!editor || editor.document.languageId !== 'eviews-prg') return;
 
-  disposable = vscode.commands.registerCommand('eviews.runEViews', async () => {
-    let eviewsPrg:string = vscode.workspace.getConfiguration('eviews-language-extension').get('eviews-path')!;
-    if(!eviewsPrg) {
-      if(process.platform!=='win32') {
-        vscode.window.showErrorMessage('EViews launch only supported on Windows');
+    const config = vscode.workspace.getConfiguration('eviews-language-extension');
+    let eviewsPrg = config.get<string>('eviews-path');
+    try {
+      if (!eviewsPrg) {
+        if (process.platform !== 'win32') {
+          vscode.window.showErrorMessage('EViews launch only supported on Windows');
+          return;
+        }
+        eviewsPrg = await selectEViewsExecutable('C:\\Program Files (x86)\\');
+        if (!eviewsPrg) return;
+        await config.update('eviews-path', eviewsPrg, vscode.ConfigurationTarget.Global);
+      }
+
+      const program = await prepareProgramForRun(editor.document);
+      if (!program.ready) {
+        const message = program.reason === 'not-file'
+          ? 'Save the EViews program to a file before running it.'
+          : 'Could not save the EViews program. Run cancelled.';
+        vscode.window.showWarningMessage(message);
         return;
       }
-      const files = vscode.window.showOpenDialog({
-        canSelectMany: false,
-        openLabel: 'Select the EViews executable',
-        defaultUri: vscode.Uri.file('C:\\Program Files (x86)\\'),
-        filters: {
-          'Eviews exectuable': ['exe']
-        }
-      }).then((uris) => {
-        if(uris && uris.length==1) {
-          const uri = uris[0];
-          if(path.extname(uri.fsPath)==='.exe') {
-            vscode.workspace.getConfiguration('eviews-language-extension').update('eviews-path', uri.fsPath, vscode.ConfigurationTarget.Global);
-            vscode.commands.executeCommand("eviews.runEViews");
-          }
-        }
-      });
-      return;
-    }
-    const editor = vscode.window.activeTextEditor;
-    if(!editor || editor.document.languageId!=='eviews-prg') return;
-    const program = await prepareProgramForRun(editor.document);
-    if (!program.ready) {
-      const message = program.reason === 'not-file'
-        ? 'Save the EViews program to a file before running it.'
-        : 'Could not save the EViews program. Run cancelled.';
-      vscode.window.showWarningMessage(message);
-      return;
-    }
 
-    const filePath = program.filePath;
-    const eviewsExec = new vscode.ProcessExecution(eviewsPrg, [filePath]);
-    const _task = new vscode.Task(
-      { type: 'eviewLaunchGroup', file: filePath },
-      vscode.TaskScope.Global,
-      `Run in EViews: ${path.basename(filePath)}`,
-      'eviewsLaunchGroup',
-      eviewsExec
-    );
-    vscode.tasks.executeTask(_task);
+      const filePath = program.filePath;
+      const execution = new vscode.ProcessExecution(eviewsPrg, [filePath]);
+      const task = new vscode.Task(
+        { type: 'eviewLaunchGroup', file: filePath },
+        vscode.TaskScope.Global,
+        `Run in EViews: ${path.basename(filePath)}`,
+        'eviewsLaunchGroup',
+        execution
+      );
+      await vscode.tasks.executeTask(task);
+    } catch (error) {
+      vscode.window.showErrorMessage(`Could not launch EViews: ${errorMessage(error)}`);
+    }
   });
 
-  context.subscriptions.push(disposable);
+  context.subscriptions.push(setEViewsPath, runEViews);
 
   const openDocs = vscode.workspace.textDocuments.filter((doc)=>doc.languageId==='eviews-prg');
   for(let doc of openDocs) {
