@@ -257,7 +257,7 @@ export class ParsedFile {
             followedIncludes.push(this);
             for(let i of this.includes) {
                 const pf = collection.files[i.uri];
-                if(followedIncludes.includes(pf)) continue
+                if(!pf || followedIncludes.includes(pf)) continue;
                 followedIncludes.push(pf);
                 const isymbols = pf.getAllSymbols(collection, null, followIncludes, false, followedIncludes, 'included ');
                 symbols = [...symbols, ...isymbols];
@@ -297,7 +297,7 @@ export class ParsedFile {
             followedIncludes.push(this);
             for(let i of this.includes) {
                 const pf = collection.files[i.uri];
-                if(followedIncludes.includes(pf)) continue
+                if(!pf || followedIncludes.includes(pf)) continue;
                 followedIncludes.push(pf);
                 const symbol = pf.getSymbol(collection, name, null, followIncludes, false, followedIncludes, 'included ');
                 if(symbol!==undefined) {
@@ -364,7 +364,7 @@ export class ParsedFile {
                     const doc = await vscode.workspace.openTextDocument(res);
                     uri = doc.uri.toString();
                 } catch(error) {
-                    uri = res;
+                    uri = vscode.Uri.file(res).toString();
                 }
                 // const resReal = fs.realpathSync(res);
                 // const uri = vscode.Uri.file(resReal).toString();
