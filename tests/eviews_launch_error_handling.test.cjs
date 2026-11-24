@@ -111,6 +111,7 @@ const run = () => commands.get('eviews.runEViews')();
 const setPath = () => commands.get('eviews.setEViewsPath')();
 
 beforeEach(() => {
+  Object.defineProperty(process, 'platform', { value: 'win32', configurable: true });
   state.setting = pathToEViews;
   state.errors = [];
   state.warnings = [];
@@ -139,6 +140,15 @@ test('configured executable launches active program and preserves per-file task 
   assert.deepEqual(state.tasks[0].definition, { type: 'eviewLaunchGroup', file: programPath });
   assert.deepEqual(state.updates, []);
   assert.deepEqual(state.errors, []);
+});
+
+test('configured executable does not bypass the Windows-only launch restriction', async () => {
+  Object.defineProperty(process, 'platform', { value: 'linux', configurable: true });
+  await run();
+  assert.equal(state.tasks.length, 0);
+  assert.equal(state.dialogCalls.length, 0);
+  assert.deepEqual(state.updates, []);
+  assert.deepEqual(state.errors, ['EViews launch only supported on Windows']);
 });
 
 test('first run waits for the path update before launching (without recursive command)', async () => {

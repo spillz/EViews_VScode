@@ -343,6 +343,11 @@ export function activate(context: vscode.ExtensionContext) {
   });
 
   const runEViews = vscode.commands.registerCommand('eviews.runEViews', async () => {
+    if (process.platform !== 'win32') {
+      vscode.window.showErrorMessage('EViews launch only supported on Windows');
+      return;
+    }
+
     const editor = vscode.window.activeTextEditor;
     if (!editor || editor.document.languageId !== 'eviews-prg') return;
 
@@ -350,10 +355,6 @@ export function activate(context: vscode.ExtensionContext) {
     let eviewsPrg = config.get<string>('eviews-path');
     try {
       if (!eviewsPrg) {
-        if (process.platform !== 'win32') {
-          vscode.window.showErrorMessage('EViews launch only supported on Windows');
-          return;
-        }
         eviewsPrg = await selectEViewsExecutable('C:\\Program Files (x86)\\');
         if (!eviewsPrg) return;
         await config.update('eviews-path', eviewsPrg, vscode.ConfigurationTarget.Global);
